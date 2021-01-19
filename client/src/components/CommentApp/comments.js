@@ -135,6 +135,7 @@ function initFieldLevelCommentWidget(fieldElement) {
 }
 
 export default {
+  getContentPath,
   initComments,
   FieldLevelCommentWidget,
   initFieldLevelCommentWidget
