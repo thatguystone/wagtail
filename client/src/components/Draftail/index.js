@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { DraftailEditor } from 'draftail';
 import { EditorState, RichUtils } from 'draft-js';
@@ -52,65 +52,52 @@ class DraftailInlineAnnotation {
     this.setEditorState = setEditorState;
     this.editor = editor;
     this.ref = initialRef;
+    this.setHidden = null;
+    this.setFocused = null;
+    this.onClickHandler = null;
   }
   onDelete() {
     this.editor.onRemoveEntity(this.entityKey, '');
   }
+  onDecoratorAttached(ref, setHidden, setFocused) {
+    this.ref = ref;
+    this.setHidden = setHidden;
+    this.setFocused = setFocused;
+  }
   onFocus() {
-    // Add a focused state to the entity
-    const editorState = this.getEditorState();
-    const content = editorState.getCurrentContent();
-    const contentWithNewData = content.mergeEntityData(this.entityKey, {focused: true}).set('blockMap', content.getBlockMap().asMutable().asImmutable());
-    const newEditorState = EditorState.push(
-      editorState,
-      contentWithNewData,
-      'change-block-data'
-    );
-    this.editor.onChange(EditorState.set(newEditorState, {}));
+    if (this.setFocused) {
+      this.setFocused(true);
+    }
   }
   onUnfocus() {
-    // Add an unfocused state to the entity
-    const editorState = this.getEditorState();
-    const content = editorState.getCurrentContent();
-    const contentWithNewData = content.mergeEntityData(this.entityKey, {focused: false}).set('blockMap', content.getBlockMap().asMutable().asImmutable());
-    const newEditorState = EditorState.push(
-      editorState,
-      contentWithNewData,
-      'change-block-data'
-    );
-    this.editor.onChange(EditorState.set(newEditorState, {}));
+    if (this.setFocused) {
+      this.setFocused(false);
+    }
   }
   show() {
-    const editorState = this.getEditorState();
-    const content = editorState.getCurrentContent();
-    const contentWithNewData = content.mergeEntityData(this.entityKey, {hidden: false}).set('blockMap', content.getBlockMap().asMutable().asImmutable());
-    const newEditorState = EditorState.push(
-      editorState,
-      contentWithNewData,
-      'change-block-data'
-    );
-    this.editor.onChange(EditorState.set(newEditorState, {}));
+    if (this.setHidden) {
+      this.setHidden(false);
+    }
   }
   hide() {
-    const editorState = this.getEditorState();
-    const content = editorState.getCurrentContent();
-    const contentWithNewData = content.mergeEntityData(this.entityKey, {hidden: true});
-    const newEditorState = EditorState.push(
-      editorState,
-      contentWithNewData,
-      'change-block-data'
-    );
-    this.editor.onChange(EditorState.set(newEditorState, {}));
+    if (this.setHidden) {
+      this.setHidden(true);
+    }
   }
   setOnClickHandler(handler) {
-    // This will need refactoring to be compatible with how Draftail decorators get info
+    this.onClickHandler = handler;
+  }
+  onClick() {
+    if (this.onClickHandler) {
+      this.onClickHandler()
+    }
   }
   getDesiredPosition() {
-    console.log(this);
-    return this.ref.current.getBoundingClientRect().top + document.documentElement.scrollTop
-  }
-  setRef(ref) {
-    this.ref = ref;
+    const node = this.ref.current;
+    if (node) {
+      return node.getBoundingClientRect().top + document.documentElement.scrollTop
+    }
+    return 0
   }
 }
 
@@ -180,22 +167,25 @@ class DraftailCommentWidget {
     return CommentSource;
   }
   getDecorator() {
-    const CommentDecorator = ({ entityKey, contentState, children }) => {
-      const { hidden, focused } = contentState.getEntity(entityKey).getData()
+    const CommentDecorator = ({ entityKey, children }) => {
+      const [hidden, setHidden] = useState(false);
+      const [focused, setFocused] = useState(false);
       const annotationNode = useRef(null);
       useEffect(() => {
-        this.annotations.get(entityKey).setRef(annotationNode);
+        this.annotations.get(entityKey).onDecoratorAttached(annotationNode, setHidden, setFocused);
       });
+      const onClick = () => {
+        this.annotations.get(entityKey).onClick()
+      }
 
       if (hidden) {
-        return null;
+        return <span ref={annotationNode}>{children}</span>
       }
     
       return (
-        <b ref={annotationNode}>
-          {focused ? "FOCUSED" : "UNFOCUSED"}
+        <button type="button" className="button unbutton" style={{'text-transform': 'none', 'background-color': focused ? '#01afb0' : '#007d7e'}} ref={annotationNode} onClick={onClick} data-annotation>
           {children}
-        </b>
+        </button>
       )
     }
     return CommentDecorator
@@ -254,7 +244,7 @@ const initEditor = (selector, options, currentScript) => {
   const comments = new DraftailCommentWidget(field);
   console.log(comments);
 
-  const ent = {
+  const commentEntity = {
     type: "COMMENT",
     label: "Comment",
     description: "Comment",
@@ -262,7 +252,7 @@ const initEditor = (selector, options, currentScript) => {
     source: comments.getSource(),
     decorator: comments.getDecorator(),
   }
-  entityTypes.push(ent);
+  entityTypes.push(commentEntity);
 
   const editor = (
     <EditorFallback field={field}>
