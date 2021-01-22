@@ -56,33 +56,48 @@ class DraftailInlineAnnotation {
     this.setFocused = null;
     this.onClickHandler = null;
   }
+  forceResetEditorState(editorState) {
+    return EditorState.set(
+      EditorState.createWithContent(
+        editorState.getCurrentContent(),
+        editorState.getDecorator(),
+      ),
+      {
+        selection: editorState.getSelection(),
+        undoStack: editorState.getUndoStack(),
+        redoStack: editorState.getRedoStack(),
+      },
+    );
+  };
+  updateEntityData(update) {
+    // Add a focused state to the entity
+    const editorState = this.getEditorState();
+    const content = editorState.getCurrentContent();
+    const contentWithNewData = content.mergeEntityData(this.entityKey, update);
+    const newEditorState = EditorState.push(
+      editorState,
+      contentWithNewData,
+      'change-block-data'
+    );
+    this.editor.onChange(this.forceResetEditorState(newEditorState));
+  }
   onDelete() {
     this.editor.onRemoveEntity(this.entityKey, '');
   }
-  onDecoratorAttached(ref, setHidden, setFocused) {
-    this.ref = ref;
-    this.setHidden = setHidden;
-    this.setFocused = setFocused;
-  }
   onFocus() {
-    if (this.setFocused) {
-      this.setFocused(true);
-    }
+    this.updateEntityData({focused: true});
+  }
+  onDecoratorAttached(ref) {
+    this.ref = ref;
   }
   onUnfocus() {
-    if (this.setFocused) {
-      this.setFocused(false);
-    }
+    this.updateEntityData({focused: false});
   }
   show() {
-    if (this.setHidden) {
-      this.setHidden(false);
-    }
+    this.updateEntityData({visible: true});
   }
   hide() {
-    if (this.setHidden) {
-      this.setHidden(true);
-    }
+    this.updateEntityData({visible: false});
   }
   setOnClickHandler(handler) {
     this.onClickHandler = handler;
@@ -148,7 +163,7 @@ class DraftailCommentWidget {
           entityType.type,
           "MUTABLE",
           { 
-            hidden: false,
+            visble: true,
             focused: false,
           },
         )
@@ -167,18 +182,17 @@ class DraftailCommentWidget {
     return CommentSource;
   }
   getDecorator() {
-    const CommentDecorator = ({ entityKey, children }) => {
-      const [hidden, setHidden] = useState(false);
-      const [focused, setFocused] = useState(false);
+    const CommentDecorator = ({ entityKey, contentState, children }) => {
+      const {visible, focused} = contentState.getEntity(entityKey).getData();
       const annotationNode = useRef(null);
       useEffect(() => {
-        this.annotations.get(entityKey).onDecoratorAttached(annotationNode, setHidden, setFocused);
+        this.annotations.get(entityKey).onDecoratorAttached(annotationNode);
       });
       const onClick = () => {
         this.annotations.get(entityKey).onClick()
       }
 
-      if (hidden) {
+      if (!visible) {
         return <span ref={annotationNode}>{children}</span>
       }
     
