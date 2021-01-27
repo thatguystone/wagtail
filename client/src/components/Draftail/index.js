@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { DraftailEditor } from 'draftail';
 import { EditorState, RichUtils } from 'draft-js';
+import DraftOffsetKey from 'draft-js/lib/DraftOffsetKey';
 
 import { IS_IE11, STRINGS } from '../../config/wagtailConfig';
 
@@ -46,8 +47,7 @@ export const wrapWagtailIcon = type => {
 };
 
 class DraftailInlineAnnotation {
-  constructor(entityKey, initialRef, getEditorState, setEditorState, editor) {
-    this.entityKey = entityKey;
+  constructor(initialRef, getEditorState, setEditorState, editor) {
     this.getEditorState = getEditorState;
     this.setEditorState = setEditorState;
     this.editor = editor;
@@ -69,35 +69,18 @@ class DraftailInlineAnnotation {
       },
     );
   };
-  updateEntityData(update) {
-    // Add a focused state to the entity
-    const editorState = this.getEditorState();
-    const content = editorState.getCurrentContent();
-    const contentWithNewData = content.mergeEntityData(this.entityKey, update);
-    const newEditorState = EditorState.push(
-      editorState,
-      contentWithNewData,
-      'change-block-data'
-    );
-    this.editor.onChange(this.forceResetEditorState(newEditorState));
-  }
   onDelete() {
-    this.editor.onRemoveEntity(this.entityKey, '');
   }
   onFocus() {
-    this.updateEntityData({focused: true});
   }
   onDecoratorAttached(ref) {
     this.ref = ref;
   }
   onUnfocus() {
-    this.updateEntityData({focused: false});
   }
   show() {
-    this.updateEntityData({visible: true});
   }
   hide() {
-    this.updateEntityData({visible: false});
   }
   setOnClickHandler(handler) {
     this.onClickHandler = handler;
@@ -148,7 +131,13 @@ class DraftailCommentWidget {
         window.commentApp.registerWidget(this);
         this.setEditorState = PluginFunctions.setEditorState;
         this.getEditorState = PluginFunctions.getEditorState;
-      }
+      },
+      decorators: [
+        {
+          strategy: this.getDecoratorStrategy(),
+          component: this.getDecorator(),
+        }
+      ]
     }
     return plugin;
   }
@@ -156,24 +145,12 @@ class DraftailCommentWidget {
 
   }
   getSource() {
-    const CommentSource = ({ editorState, entityType, onComplete }) => {
+    const CommentSource = ({ editorState, onComplete }) => {
       useEffect(() => {
-        const content = editorState.getCurrentContent();
-        const contentWithEntity = content.createEntity(
-          entityType.type,
-          "MUTABLE",
-          { 
-            visble: true,
-            focused: false,
-          },
-        )
-        const selection = editorState.getSelection();
-        const entityKey = contentWithEntity.getLastCreatedEntityKey()
-        const nextState = RichUtils.toggleLink(editorState, selection, entityKey);
-
-        const annotation = new DraftailInlineAnnotation(entityKey, {current: this.fieldNode}, this.getEditorState, this.setEditorState, this.fieldNode.draftailEditor);
-        this.annotations.set(entityKey, annotation);
-        this.makeComment(annotation, this.contentpath);
+        const annotation = new DraftailInlineAnnotation({current: this.fieldNode}, this.getEditorState, this.setEditorState, this.fieldNode.draftailEditor);
+        const commentId = this.makeComment(annotation, this.contentpath);
+        this.annotations.set(commentId, annotation);
+        const nextState = RichUtils.toggleInlineStyle(editorState, `COMMENT-${commentId}`);
         onComplete(nextState);
         }, []
     );
@@ -182,27 +159,30 @@ class DraftailCommentWidget {
     return CommentSource;
   }
   getDecorator() {
-    const CommentDecorator = ({ entityKey, contentState, children }) => {
-      const {visible, focused} = contentState.getEntity(entityKey).getData();
+    const CommentDecorator = ({ contentState, children, offsetKey }) => {
+      const blockKey = children[0].props.block.getKey()
+      const start = children[0].props.start
+      const commentId = useMemo(() => parseInt(contentState.getBlockForKey(blockKey).getInlineStyleAt(start).find((style) => style.startsWith('COMMENT')).slice(8)), [blockKey, start]);
       const annotationNode = useRef(null);
       useEffect(() => {
-        this.annotations.get(entityKey).onDecoratorAttached(annotationNode);
+        this.annotations.get(commentId).onDecoratorAttached(annotationNode);
       });
       const onClick = () => {
-        this.annotations.get(entityKey).onClick()
-      }
-
-      if (!visible) {
-        return <span ref={annotationNode}>{children}</span>
+        this.annotations.get(commentId).onClick()
       }
     
       return (
-        <button type="button" className="button unbutton" style={{'text-transform': 'none', 'background-color': focused ? '#01afb0' : '#007d7e'}} ref={annotationNode} onClick={onClick} data-annotation>
+        <button type="button" className="button unbutton" style={{'text-transform': 'none', 'background-color': true ? '#01afb0' : '#007d7e'}} ref={annotationNode} onClick={onClick} data-annotation>
           {children}
         </button>
       )
     }
     return CommentDecorator
+  }
+  getDecoratorStrategy() {
+    return (contentBlock, callback, contentState) => {
+      contentBlock.findStyleRanges((metadata) => metadata.getStyle().some((style) => style.startsWith('COMMENT')), (start, end) => {callback(start, end)})
+    }
   }
 }
 
