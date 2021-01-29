@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { DraftailEditor } from 'draftail';
 import { EditorState, RichUtils } from 'draft-js';
-import DraftOffsetKey from 'draft-js/lib/DraftOffsetKey';
+import { Provider } from 'react-redux';
 
 import { IS_IE11, STRINGS } from '../../config/wagtailConfig';
 
@@ -159,7 +159,7 @@ class DraftailCommentWidget {
     return CommentSource;
   }
   getDecorator() {
-    const CommentDecorator = ({ contentState, children, offsetKey }) => {
+    const CommentDecorator = ({ contentState, children }) => {
       const blockKey = children[0].props.block.getKey()
       const start = children[0].props.start
       const commentId = useMemo(() => parseInt(contentState.getBlockForKey(blockKey).getInlineStyleAt(start).find((style) => style.startsWith('COMMENT')).slice(8)), [blockKey, start]);
@@ -184,6 +184,51 @@ class DraftailCommentWidget {
       contentBlock.findStyleRanges((metadata) => metadata.getStyle().some((style) => style.startsWith('COMMENT')), (start, end) => {callback(start, end)})
     }
   }
+}
+
+function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, options, blockTypes, inlineStyles, entityTypes, options, enableHorizontalRule}) {
+  return   <EditorFallback field={field}>
+  <DraftailEditor
+    ref={editorRef}
+    rawContentState={rawContentState}
+    onSave={onSave}
+    placeholder={STRINGS.WRITE_HERE}
+    spellCheck={true}
+    enableLineBreak={{
+      description: STRINGS.LINE_BREAK,
+      icon: BR_ICON,
+    }}
+    showUndoControl={{ description: STRINGS.UNDO }}
+    showRedoControl={{ description: STRINGS.REDO }}
+    maxListNesting={4}
+    // Draft.js + IE 11 presents some issues with pasting rich text. Disable rich paste there.
+    stripPastedStyles={IS_IE11}
+    {...options}
+    plugins={plugins}
+    blockTypes={blockTypes.map(wrapWagtailIcon)}
+    inlineStyles={inlineStyles.map(wrapWagtailIcon)}
+    entityTypes={entityTypes}
+    enableHorizontalRule={enableHorizontalRule}
+  />
+</EditorFallback>
+}
+
+function CommentStoreWrapper({plugins, field, editorRef, rawContentState, onSave, options, blockTypes, inlineStyles, entityTypes, enableHorizontalRule}) {
+  const [store, setStore] = useState()
+  return (<Provider store={store}>
+    <CommentableEditor
+      field={field}
+      plugins={plugins}
+      editorRef={editorRef}
+      rawContentState={rawContentState}
+      onSave={onSave}
+      options={options}
+      blockTypes={blockTypes}
+      inlineStyles={inlineStyles}
+      entityTypes={entityTypes}
+      enableHorizontalRule={enableHorizontalRule}
+    />
+  </Provider>)
 }
 
 /**
@@ -249,30 +294,18 @@ const initEditor = (selector, options, currentScript) => {
   entityTypes.push(commentEntity);
 
   const editor = (
-    <EditorFallback field={field}>
-      <DraftailEditor
-        ref={editorRef}
+      <CommentStoreWrapper
+        field={field}
+        editorRef={editorRef}
         rawContentState={rawContentState}
         onSave={serialiseInputValue}
-        placeholder={STRINGS.WRITE_HERE}
-        spellCheck={true}
-        enableLineBreak={{
-          description: STRINGS.LINE_BREAK,
-          icon: BR_ICON,
-        }}
-        showUndoControl={{ description: STRINGS.UNDO }}
-        showRedoControl={{ description: STRINGS.REDO }}
-        maxListNesting={4}
-        // Draft.js + IE 11 presents some issues with pasting rich text. Disable rich paste there.
-        stripPastedStyles={IS_IE11}
         {...options}
         plugins={[comments.getPlugin()]}
-        blockTypes={blockTypes.map(wrapWagtailIcon)}
-        inlineStyles={inlineStyles.map(wrapWagtailIcon)}
+        blockTypes={blockTypes}
+        inlineStyles={inlineStyles}
         entityTypes={entityTypes}
         enableHorizontalRule={enableHorizontalRule}
       />
-    </EditorFallback>
   );
 
   ReactDOM.render(editor, editorWrapper);
