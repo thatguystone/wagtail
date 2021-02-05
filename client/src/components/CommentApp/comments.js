@@ -102,6 +102,12 @@ class FieldLevelCommentWidget {
       if (previousComments !== currentComments) {
         this.commentNumber = currentComments.length;
         this.updateVisibility()
+        currentComments.filter((comment) => comment.annotation === null).forEach((comment) => {
+          commentApp.updateAnnotation(
+            this.getAnnotationForComment(comment),
+            comment.localId
+          );
+        });
       }
     });
     state.comments.comments.forEach((comment) => {
@@ -110,12 +116,10 @@ class FieldLevelCommentWidget {
         commentApp.updateAnnotation(annotation, comment.localId);
       }
     });
-    return { unsubscribeWidgetEnable, unsubscribeWidgetComments }; // TODO: listen for widget deletion and use these
-  }
-  onRegister(makeComment) {
     this.commentAdditionNode.addEventListener('click', () => {
-      makeComment(this.getAnnotationForComment(), this.contentpath);
+      commentApp.makeComment(this.getAnnotationForComment(), this.contentpath);
     });
+    return { unsubscribeWidgetEnable, unsubscribeWidgetComments }; // TODO: listen for widget deletion and use these
   }
   setEnabled(enabled) {
     // Update whether comments are enabled for the page
