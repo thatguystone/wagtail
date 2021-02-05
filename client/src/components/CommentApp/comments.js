@@ -37,9 +37,48 @@ class BasicFieldLevelAnnotation {
     this.node = node;
     this.fieldNode = fieldNode;
     this.position = '';
+    this.unsubscribe = null;
+  }
+  subscribeToUpdates(localId, store) {
+    const initialState = store.getState()
+    let focused = false;
+    let shown = initialState.settings.commentsEnabled;
+    if (initialState.comments.focusedComment === localId) {
+      this.onFocus()
+      focused = true;
+    }
+    this.unsubscribe = store.subscribe(() => 
+      {
+        const state = store.getState()
+        const comment = state.comments.comments.get(localId);
+        if (comment === undefined) {
+          this.onDelete();
+        }
+        const nowFocused = (state.comments.focusedComment === localId)
+        if (nowFocused !== focused) {
+          if (focused) {
+            this.onUnfocus();
+          } else {
+            this.onFocus();
+          }
+        }
+        focused = nowFocused;
+        if (shown !== state.settings.commentsEnabled) {
+          if (shown) {
+            this.hide();
+          } else {
+            this.show();
+          }
+        }
+        shown = state.settings.commentsEnabled;
+      }
+    )
   }
   onDelete() {
     this.node.remove();
+    if (this.unsubscribe) {
+      this.unsubscribe()
+    }
   }
   onFocus() {
     this.node.classList.remove('button-secondary');
@@ -103,10 +142,12 @@ class FieldLevelCommentWidget {
         this.commentNumber = currentComments.length;
         this.updateVisibility()
         currentComments.filter((comment) => comment.annotation === null).forEach((comment) => {
+          const annotation = this.getAnnotationForComment(comment);
           commentApp.updateAnnotation(
-            this.getAnnotationForComment(comment),
+            annotation,
             comment.localId
           );
+          annotation.subscribeToUpdates(comment.localId, commentApp.store);
         });
       }
     });
@@ -114,10 +155,13 @@ class FieldLevelCommentWidget {
       if (comment.contentpath === widget.contentpath) {
         const annotation = this.getAnnotationForComment(comment);
         commentApp.updateAnnotation(annotation, comment.localId);
+        annotation.subscribeToUpdates(localId, commentApp.store);
       }
     });
     this.commentAdditionNode.addEventListener('click', () => {
-      commentApp.makeComment(this.getAnnotationForComment(), this.contentpath);
+      const annotation = this.getAnnotationForComment();
+      const localId = commentApp.makeComment(annotation, this.contentpath);
+      annotation.subscribeToUpdates(localId, commentApp.store);
     });
     return { unsubscribeWidgetEnable, unsubscribeWidgetComments }; // TODO: listen for widget deletion and use these
   }
