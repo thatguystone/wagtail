@@ -5,3 +5,5 @@ import comments from '../../../../../client/src/components/CommentApp/comments';
  */
 // Expose module as a global.
 window.comments = comments;
+
+comments.initComments();

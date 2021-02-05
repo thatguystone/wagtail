@@ -867,11 +867,7 @@ class CommentPanel(EditHandler):
 
     def render(self):
         panel = render_to_string(self.template, self.get_context())
-        js = "window.comments.initComments()"
-        return widget_with_script(panel, js)
-
-    def render_js_init(self):
-        return mark_safe(render_to_string(self.js_template, {}))
+        return panel
 
 
 # Now that we've defined EditHandlers, we can set up wagtailcore.Page to have some.

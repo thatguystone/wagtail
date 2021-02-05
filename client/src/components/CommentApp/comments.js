@@ -1,16 +1,8 @@
-import { initCommentsApp } from 'wagtail-comment-frontend';
+import { initCommentApp } from 'wagtail-comment-frontend';
 import { STRINGS } from '../../config/wagtailConfig';
 
 function initComments() {
-  // in case any widgets try to initialise themselves before the comment app,
-  // store their initialisations as callbacks to be executed when the comment app
-  // itself is finished initialising.
-  const callbacks = [];
-  window.commentApp = {
-    registerWidget: (widget) => {
-      callbacks.push(() => { window.commentApp.registerWidget(widget); });
-    }
-  };
+  window.commentApp = initCommentApp();
   document.addEventListener('DOMContentLoaded', () => {
     const commentsElement = document.getElementById('comments');
     const commentsOutputElement = document.getElementById('comments-output');
@@ -19,10 +11,9 @@ function initComments() {
       throw new Error('Comments app failed to initialise. Missing HTML element');
     }
     const data = JSON.parse(dataElement.textContent);
-    window.commentApp = initCommentsApp(
+    window.commentApp.renderApp(
       commentsElement, commentsOutputElement, data.user, data.comments, new Map(Object.entries(data.authors)), STRINGS
     );
-    callbacks.forEach((callback) => { callback(); });
   });
 }
 
@@ -81,7 +72,7 @@ class FieldLevelCommentWidget {
   constructor({
     fieldNode,
     commentAdditionNode,
-    annotationTemplateNode
+    annotationTemplateNode,
   }) {
     this.fieldNode = fieldNode;
     this.contentpath = getContentPath(fieldNode);
@@ -89,6 +80,37 @@ class FieldLevelCommentWidget {
     this.annotationTemplateNode = annotationTemplateNode;
     this.commentNumber = 0;
     this.commentsEnabled = false;
+  }
+  register(commentApp) {
+    const state = commentApp.store.getState();
+    let currentlyEnabled = state.settings.commentsEnabled;
+    this.setEnabled(currentlyEnabled);
+    const unsubscribeWidgetEnable = commentApp.store.subscribe(() => {
+      const previouslyEnabled = currentlyEnabled;
+      currentlyEnabled = commentApp.store.getState().settings.commentsEnabled;
+      if (previouslyEnabled !== currentlyEnabled) {
+        this.setEnabled(currentlyEnabled);
+      }
+    });
+    const selectCommentsForContentPath = commentApp.selectCommentsForContentPathFactory(
+      this.contentpath
+    );
+    let currentComments = selectCommentsForContentPath(state);
+    const unsubscribeWidgetComments = commentApp.store.subscribe(() => {
+      const previousComments = currentComments;
+      currentComments = selectCommentsForContentPath(commentApp.store.getState());
+      if (previousComments !== currentComments) {
+        this.commentNumber = currentComments.length;
+        this.updateVisibility()
+      }
+    });
+    state.comments.comments.forEach((comment) => {
+      if (comment.contentpath === widget.contentpath) {
+        const annotation = this.getAnnotationForComment(comment);
+        commentApp.updateAnnotation(annotation, comment.localId);
+      }
+    });
+    return { unsubscribeWidgetEnable, unsubscribeWidgetComments }; // TODO: listen for widget deletion and use these
   }
   onRegister(makeComment) {
     this.commentAdditionNode.addEventListener('click', () => {
@@ -130,7 +152,7 @@ function initFieldLevelCommentWidget(fieldElement) {
     annotationTemplateNode: document.querySelector('#comment-icon')
   });
   if (widget.contentpath) {
-    window.commentApp.registerWidget(widget);
+    widget.register(window.commentApp);
   }
 }
 
