@@ -33,46 +33,53 @@ function getContentPath(fieldNode) {
 }
 
 class BasicFieldLevelAnnotation {
-  constructor(fieldNode, node) {
+  constructor(fieldNode, node, commentApp) {
     this.node = node;
     this.fieldNode = fieldNode;
     this.position = '';
     this.unsubscribe = null;
+    this.commentApp = commentApp;
   }
-  subscribeToUpdates(localId, store) {
-    const initialState = store.getState()
-    let focused = false;
-    let shown = initialState.settings.commentsEnabled;
-    if (initialState.comments.focusedComment === localId) {
-      this.onFocus()
-      focused = true;
+  subscribeToUpdates(localId) {
+    const { selectFocused, selectEnabled } = this.commentApp.selectors;
+    const selectComment = this.commentApp.utils.selectCommentFactory(localId);
+    const store = this.commentApp.store;
+    const initialState = store.getState();
+    let focused = selectFocused(initialState) === localId;
+    let shown = selectEnabled(initialState);
+    if (focused) {
+      this.onFocus();
+    }
+    if (shown) {
+      this.show();
     }
     this.unsubscribe = store.subscribe(() => 
       {
-        const state = store.getState()
-        const comment = state.comments.comments.get(localId);
+        const state = store.getState();
+        const comment = selectComment(state);
         if (comment === undefined) {
           this.onDelete();
         }
-        const nowFocused = (state.comments.focusedComment === localId)
+        const nowFocused = (selectFocused(state) === localId)
         if (nowFocused !== focused) {
           if (focused) {
             this.onUnfocus();
           } else {
             this.onFocus();
           }
+          focused = nowFocused;
         }
-        focused = nowFocused;
-        if (shown !== state.settings.commentsEnabled) {
+        if (shown !== selectEnabled(state)) {
           if (shown) {
             this.hide();
           } else {
             this.show();
           }
+          shown = selectEnabled(state);
         }
-        shown = state.settings.commentsEnabled;
       }
     )
+    this.setOnClickHandler(localId);
   }
   onDelete() {
     this.node.remove();
@@ -96,8 +103,15 @@ class BasicFieldLevelAnnotation {
   hide() {
     this.node.classList.add('u-hidden');
   }
-  setOnClickHandler(handler) {
-    this.node.addEventListener('click', handler);
+  setOnClickHandler(localId) {
+    this.node.addEventListener('click', () => {
+      this.commentApp.store.dispatch(
+        this.commentApp.actions.setFocusedComment(localId)
+      );
+      this.commentApp.store.dispatch(
+        this.commentApp.actions.setPinnedComment(localId)
+      );
+    });
   }
   getDesiredPosition() {
     return (
@@ -112,73 +126,72 @@ class FieldLevelCommentWidget {
     fieldNode,
     commentAdditionNode,
     annotationTemplateNode,
+    commentApp
   }) {
     this.fieldNode = fieldNode;
     this.contentpath = getContentPath(fieldNode);
     this.commentAdditionNode = commentAdditionNode;
     this.annotationTemplateNode = annotationTemplateNode;
-    this.commentNumber = 0;
-    this.commentsEnabled = false;
+    this.shown = false;
+    this.commentApp = commentApp;
   }
-  register(commentApp) {
-    const state = commentApp.store.getState();
-    let currentlyEnabled = state.settings.commentsEnabled;
-    this.setEnabled(currentlyEnabled);
-    const unsubscribeWidgetEnable = commentApp.store.subscribe(() => {
-      const previouslyEnabled = currentlyEnabled;
-      currentlyEnabled = commentApp.store.getState().settings.commentsEnabled;
-      if (previouslyEnabled !== currentlyEnabled) {
-        this.setEnabled(currentlyEnabled);
-      }
-    });
-    const selectCommentsForContentPath = commentApp.selectCommentsForContentPathFactory(
+  register() {
+    const { selectEnabled } = this.commentApp.selectors;
+    const initialState = this.commentApp.store.getState();
+    let currentlyEnabled = selectEnabled(initialState);
+    const selectCommentsForContentPath = this.commentApp.utils.selectCommentsForContentPathFactory(
       this.contentpath
     );
-    let currentComments = selectCommentsForContentPath(state);
-    const unsubscribeWidgetComments = commentApp.store.subscribe(() => {
-      const previousComments = currentComments;
-      currentComments = selectCommentsForContentPath(commentApp.store.getState());
-      if (previousComments !== currentComments) {
-        this.commentNumber = currentComments.length;
-        this.updateVisibility()
+    let currentComments = selectCommentsForContentPath(initialState);
+    this.updateVisibility(currentComments.length === 0 && currentlyEnabled);
+    const unsubscribeWidget = this.commentApp.store.subscribe(() => {
+      const state = this.commentApp.store.getState()
+      const newComments = selectCommentsForContentPath(state);
+      const newEnabled = selectEnabled(state);
+      const commentsChanged = (currentComments !== newComments)
+      const enabledChanged = (currentlyEnabled !== newEnabled)
+      if (commentsChanged) {
+        // Add annotations for any new comments
+        currentComments = newComments;
         currentComments.filter((comment) => comment.annotation === null).forEach((comment) => {
           const annotation = this.getAnnotationForComment(comment);
-          commentApp.updateAnnotation(
+          this.commentApp.updateAnnotation(
             annotation,
             comment.localId
           );
-          annotation.subscribeToUpdates(comment.localId, commentApp.store);
+          annotation.subscribeToUpdates(comment.localId, this.commentApp.store);
         });
       }
+      if (enabledChanged || commentsChanged) {
+        // If comments have been enabled or disabled, or the comments have changed
+        // check whether to show the widget (if comments are enabled and there are no existing comments)
+        currentlyEnabled = newEnabled;
+        this.updateVisibility(currentComments.length === 0 && currentlyEnabled);
+      }
     });
-    state.comments.comments.forEach((comment) => {
+    initialState.comments.comments.forEach((comment) => {
+      // Add annotations for any comments already in the store
       if (comment.contentpath === widget.contentpath) {
         const annotation = this.getAnnotationForComment(comment);
-        commentApp.updateAnnotation(annotation, comment.localId);
-        annotation.subscribeToUpdates(localId, commentApp.store);
+        this.commentApp.updateAnnotation(annotation, comment.localId);
+        annotation.subscribeToUpdates(localId);
       }
     });
     this.commentAdditionNode.addEventListener('click', () => {
+      // Make the widget button clickable to add a comment
       const annotation = this.getAnnotationForComment();
-      const localId = commentApp.makeComment(annotation, this.contentpath);
-      annotation.subscribeToUpdates(localId, commentApp.store);
+      const localId = this.commentApp.makeComment(annotation, this.contentpath);
+      annotation.subscribeToUpdates(localId);
     });
-    return { unsubscribeWidgetEnable, unsubscribeWidgetComments }; // TODO: listen for widget deletion and use these
+    return unsubscribeWidget; // TODO: listen for widget deletion and use this
   }
-  setEnabled(enabled) {
-    // Update whether comments are enabled for the page
-    this.commentsEnabled = enabled;
-    this.updateVisibility();
-  }
-  onChangeComments(comments) {
-    // Receives a list of comments for the widget's contentpath
-    this.commentNumber = comments.length;
-    this.updateVisibility();
-  }
-  updateVisibility() {
-    // if comments are disabled, or the widget already has at least one associated comment,
-    // don't show the comment addition button
-    if (!this.commentsEnabled || this.commentNumber > 0) {
+  updateVisibility(newShown) {
+    if (newShown === this.shown) {
+      return
+    } else {
+      this.shown = newShown;
+    }
+    if (!this.shown) {
       this.commentAdditionNode.classList.add('u-hidden');
     } else {
       this.commentAdditionNode.classList.remove('u-hidden');
@@ -189,7 +202,7 @@ class FieldLevelCommentWidget {
     annotationNode.id = '';
     annotationNode.classList.remove('u-hidden');
     this.commentAdditionNode.insertAdjacentElement('afterend', annotationNode);
-    return new BasicFieldLevelAnnotation(this.fieldNode, annotationNode);
+    return new BasicFieldLevelAnnotation(this.fieldNode, annotationNode, this.commentApp);
   }
 }
 
@@ -197,10 +210,11 @@ function initFieldLevelCommentWidget(fieldElement) {
   const widget = new FieldLevelCommentWidget({
     fieldNode: fieldElement,
     commentAdditionNode: fieldElement.querySelector('[data-comment-add]'),
-    annotationTemplateNode: document.querySelector('#comment-icon')
+    annotationTemplateNode: document.querySelector('#comment-icon'),
+    commentApp: window.commentApp
   });
   if (widget.contentpath) {
-    widget.register(window.commentApp);
+    widget.register();
   }
 }
 
