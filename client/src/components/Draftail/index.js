@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { DraftailEditor } from 'draftail';
 import { EditorState, RichUtils } from 'draft-js';
-import { Provider } from 'react-redux';
+import { Provider, useSelector } from 'react-redux';
 
 import { IS_IE11, STRINGS } from '../../config/wagtailConfig';
 
@@ -128,16 +128,9 @@ class DraftailCommentWidget {
   getPlugin() {
     const plugin = {
       initialize: (PluginFunctions) => {
-        window.commentApp.registerWidget(this);
         this.setEditorState = PluginFunctions.setEditorState;
         this.getEditorState = PluginFunctions.getEditorState;
-      },
-      decorators: [
-        {
-          strategy: this.getDecoratorStrategy(),
-          component: this.getDecorator(),
-        }
-      ]
+      }
     }
     return plugin;
   }
@@ -148,7 +141,7 @@ class DraftailCommentWidget {
     const CommentSource = ({ editorState, onComplete }) => {
       useEffect(() => {
         const annotation = new DraftailInlineAnnotation({current: this.fieldNode}, this.getEditorState, this.setEditorState, this.fieldNode.draftailEditor);
-        const commentId = this.makeComment(annotation, this.contentpath);
+        const commentId = window.commentApp.makeComment(annotation, this.contentpath);
         this.annotations.set(commentId, annotation);
         const nextState = RichUtils.toggleInlineStyle(editorState, `COMMENT-${commentId}`);
         onComplete(nextState);
@@ -163,16 +156,19 @@ class DraftailCommentWidget {
       const blockKey = children[0].props.block.getKey()
       const start = children[0].props.start
       const commentId = useMemo(() => parseInt(contentState.getBlockForKey(blockKey).getInlineStyleAt(start).find((style) => style.startsWith('COMMENT')).slice(8)), [blockKey, start]);
+      const focusedComment = useSelector(window.commentApp.selectors.selectFocused);
       const annotationNode = useRef(null);
       useEffect(() => {
-        this.annotations.get(commentId).onDecoratorAttached(annotationNode);
+        window.comment.get(commentId).onDecoratorAttached(annotationNode);
       });
       const onClick = () => {
-        this.annotations.get(commentId).onClick()
+        window.commentApp.store.dispatch(
+          window.commentApp.actions.setFocusedComment(commentId)
+        );
       }
     
       return (
-        <button type="button" className="button unbutton" style={{'text-transform': 'none', 'background-color': true ? '#01afb0' : '#007d7e'}} ref={annotationNode} onClick={onClick} data-annotation>
+        <button type="button" className="button unbutton" style={{'text-transform': 'none', 'background-color': (focusedComment !== commentId) ? '#01afb0' : '#007d7e'}} ref={annotationNode} onClick={onClick} data-annotation>
           {children}
         </button>
       )
@@ -186,7 +182,32 @@ class DraftailCommentWidget {
   }
 }
 
-function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, options, blockTypes, inlineStyles, entityTypes, options, enableHorizontalRule}) {
+
+function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, options, enableHorizontalRule}) {
+  const commentWidget = useMemo(() => new DraftailCommentWidget(field))
+  const enabled = useSelector(window.commentApp.selectors.selectEnabled);
+  const commentEntity = {
+    type: "COMMENT",
+    label: "Comment",
+    description: "Comment",
+    icon: <Icon name="comment"/>,
+    source: commentWidget.getSource(),
+    decorator: commentWidget.getDecorator(),
+  }
+  const blockTypes = options.blockTypes || [];
+  const inlineStyles = options.inlineStyles || [];
+  let entityTypes = options.entityTypes || [];
+
+  entityTypes = entityTypes.map(wrapWagtailIcon).map((type) => {
+    const plugin = PLUGINS[type.type];
+
+    // Override the properties defined in the JS plugin: Python should be the source of truth.
+    return Object.assign({}, plugin, type);
+  });
+  const decorators = enabled ? [{
+    strategy: commentWidget.getDecoratorStrategy(),
+    component: commentWidget.getDecorator(),
+  }] : [];
   return   <EditorFallback field={field}>
   <DraftailEditor
     ref={editorRef}
@@ -204,18 +225,18 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
     // Draft.js + IE 11 presents some issues with pasting rich text. Disable rich paste there.
     stripPastedStyles={IS_IE11}
     {...options}
-    plugins={plugins}
+    plugins={[commentWidget.getPlugin()]}
+    decorators={decorators}
     blockTypes={blockTypes.map(wrapWagtailIcon)}
     inlineStyles={inlineStyles.map(wrapWagtailIcon)}
-    entityTypes={entityTypes}
+    entityTypes={enabled ? entityTypes.concat(commentEntity) : entityTypes}
     enableHorizontalRule={enableHorizontalRule}
   />
 </EditorFallback>
 }
 
-function CommentStoreWrapper({plugins, field, editorRef, rawContentState, onSave, options, blockTypes, inlineStyles, entityTypes, enableHorizontalRule}) {
-  const [store, setStore] = useState()
-  return (<Provider store={store}>
+function CommentStoreWrapper({plugins, field, editorRef, rawContentState, onSave, options, enableHorizontalRule}) {
+  return <Provider store={window.commentApp.store}>
     <CommentableEditor
       field={field}
       plugins={plugins}
@@ -223,12 +244,9 @@ function CommentStoreWrapper({plugins, field, editorRef, rawContentState, onSave
       rawContentState={rawContentState}
       onSave={onSave}
       options={options}
-      blockTypes={blockTypes}
-      inlineStyles={inlineStyles}
-      entityTypes={entityTypes}
       enableHorizontalRule={enableHorizontalRule}
     />
-  </Provider>)
+  </Provider>
 }
 
 /**
@@ -255,17 +273,6 @@ const initEditor = (selector, options, currentScript) => {
     field.value = JSON.stringify(rawContentState);
   };
 
-  const blockTypes = options.blockTypes || [];
-  const inlineStyles = options.inlineStyles || [];
-  let entityTypes = options.entityTypes || [];
-
-  entityTypes = entityTypes.map(wrapWagtailIcon).map((type) => {
-    const plugin = PLUGINS[type.type];
-
-    // Override the properties defined in the JS plugin: Python should be the source of truth.
-    return Object.assign({}, plugin, type);
-  });
-
   const enableHorizontalRule = options.enableHorizontalRule ? {
     description: STRINGS.HORIZONTAL_LINE,
   } : false;
@@ -276,22 +283,8 @@ const initEditor = (selector, options, currentScript) => {
   const editorRef = (ref) => {
     // Bind editor instance to its field so it can be accessed imperatively elsewhere.
     field.draftailEditor = ref;
+    console.log(field);
   };
-
-  // TODO: add app check
-  console.log(field);
-  const comments = new DraftailCommentWidget(field);
-  console.log(comments);
-
-  const commentEntity = {
-    type: "COMMENT",
-    label: "Comment",
-    description: "Comment",
-    icon: <Icon name="comment"/>,
-    source: comments.getSource(),
-    decorator: comments.getDecorator(),
-  }
-  entityTypes.push(commentEntity);
 
   const editor = (
       <CommentStoreWrapper
@@ -299,11 +292,8 @@ const initEditor = (selector, options, currentScript) => {
         editorRef={editorRef}
         rawContentState={rawContentState}
         onSave={serialiseInputValue}
-        {...options}
-        plugins={[comments.getPlugin()]}
-        blockTypes={blockTypes}
-        inlineStyles={inlineStyles}
-        entityTypes={entityTypes}
+        options={options}
+        plugins={[]}
         enableHorizontalRule={enableHorizontalRule}
       />
   );
