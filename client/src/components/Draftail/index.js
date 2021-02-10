@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { DraftailEditor } from 'draftail';
+import { DraftailEditor, createEditorStateFromRaw, serialiseEditorStateToRaw } from 'draftail';
 import { EditorState, RichUtils } from 'draft-js';
 import { Provider, useSelector } from 'react-redux';
 
@@ -46,6 +46,20 @@ export const wrapWagtailIcon = type => {
   return type;
 };
 
+function forceResetEditorState(editorState) {
+  return EditorState.set(
+    EditorState.createWithContent(
+      editorState.getCurrentContent(),
+      editorState.getDecorator(),
+    ),
+    {
+      selection: editorState.getSelection(),
+      undoStack: editorState.getUndoStack(),
+      redoStack: editorState.getRedoStack(),
+    },
+  );
+};
+
 class DraftailInlineAnnotation {
   constructor(initialRef, getEditorState, setEditorState, editor) {
     this.getEditorState = getEditorState;
@@ -56,19 +70,6 @@ class DraftailInlineAnnotation {
     this.setFocused = null;
     this.onClickHandler = null;
   }
-  forceResetEditorState(editorState) {
-    return EditorState.set(
-      EditorState.createWithContent(
-        editorState.getCurrentContent(),
-        editorState.getDecorator(),
-      ),
-      {
-        selection: editorState.getSelection(),
-        undoStack: editorState.getUndoStack(),
-        redoStack: editorState.getRedoStack(),
-      },
-    );
-  };
   onDelete() {
   }
   onFocus() {
@@ -159,7 +160,7 @@ class DraftailCommentWidget {
       const focusedComment = useSelector(window.commentApp.selectors.selectFocused);
       const annotationNode = useRef(null);
       useEffect(() => {
-        window.comment.get(commentId).onDecoratorAttached(annotationNode);
+        window.commentApp.store.getState().comments.comments.get(commentId).annotation.onDecoratorAttached(annotationNode);
       });
       const onClick = () => {
         window.commentApp.store.dispatch(
@@ -188,11 +189,8 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
   const enabled = useSelector(window.commentApp.selectors.selectEnabled);
   const commentEntity = {
     type: "COMMENT",
-    label: "Comment",
-    description: "Comment",
     icon: <Icon name="comment"/>,
     source: commentWidget.getSource(),
-    decorator: commentWidget.getDecorator(),
   }
   const blockTypes = options.blockTypes || [];
   const inlineStyles = options.inlineStyles || [];
@@ -204,17 +202,34 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
     // Override the properties defined in the JS plugin: Python should be the source of truth.
     return Object.assign({}, plugin, type);
   });
-  const decorators = enabled ? [{
+  const decorators = [{
     strategy: commentWidget.getDecoratorStrategy(),
     component: commentWidget.getDecorator(),
-  }] : [];
+  }];
+
+  const [editorState, setEditorState] = useState(() => createEditorStateFromRaw(rawContentState))
+
+
+  const timeoutRef = useRef();
+  useEffect(() => {
+    window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = window.setTimeout(
+      onSave(serialiseEditorStateToRaw(editorState)),
+      250,
+    );
+    return () => {
+      onSave(serialiseEditorStateToRaw(editorState));
+      window.clearTimeout(timeoutRef.current);
+    }
+  }, [editorState]);
   return   <EditorFallback field={field}>
   <DraftailEditor
     ref={editorRef}
-    rawContentState={rawContentState}
-    onSave={onSave}
+    editorState={forceResetEditorState(editorState)}
+    onChange={setEditorState}
     placeholder={STRINGS.WRITE_HERE}
     spellCheck={true}
+    onChange={setEditorState}
     enableLineBreak={{
       description: STRINGS.LINE_BREAK,
       icon: BR_ICON,
