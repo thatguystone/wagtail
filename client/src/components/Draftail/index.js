@@ -61,26 +61,24 @@ function forceResetEditorState(editorState, replacementContent) {
 };
 
 class DraftailInlineAnnotation {
-  constructor(initialRef, getEditorState, setEditorState, editor) {
-    this.getEditorState = getEditorState;
-    this.setEditorState = setEditorState;
-    this.editor = editor;
-    this.ref = initialRef;
-    this.setHidden = null;
-    this.setFocused = null;
+  constructor(fieldRef) {
+    this.fieldRef = fieldRef;
+    this.inlineRefs = new Set()
   }
-  onDecoratorAttached(ref) {
-    this.ref = ref;
+  addRef(ref) {
+    this.inlineRefs.add(ref);
   }
-  onClick() {
-    if (this.onClickHandler) {
-      this.onClickHandler()
-    }
+  removeRef(ref) {
+    this.inlineRefs.delete(ref);
   }
   getDesiredPosition() {
-    const node = this.ref.current;
-    if (node) {
-      return node.getBoundingClientRect().top + document.documentElement.scrollTop
+    const nodeTops = Array.from(this.inlineRefs).map(ref => ref.current).filter(node => node).map(node => node.getBoundingClientRect().top)
+    if (nodeTops.length > 0) {
+      return nodeTops.reduce((a,b) => a + b, 0)/nodeTops.length + document.documentElement.scrollTop
+    }
+    const fieldNode = this.fieldRef.current
+    if (fieldNode) {
+      return fieldNode.getBoundingClientRect().top + document.documentElement.scrollTop
     }
     return 0
   }
@@ -148,7 +146,13 @@ class DraftailCommentWidget {
       useEffect(() => {
         const comment = window.commentApp.store.getState().comments.comments.get(commentId)
         if (comment) {
-          comment.annotation.onDecoratorAttached(annotationNode);
+          comment.annotation.addRef(annotationNode);
+        }
+        return () => {
+          const comment = window.commentApp.store.getState().comments.comments.get(commentId)
+          if (comment) {
+            comment.annotation.removeRef(annotationNode);
+          }
         }
       });
       const onClick = () => {
@@ -213,7 +217,6 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
         (metadata) => metadata.getStyle().some((style) => style.startsWith('COMMENT')), 
         (start) => {block.getInlineStyleAt(start).filter((style) => style.startsWith('COMMENT')).forEach((value => commentIds.add(parseInt(value.slice(8)))))})
     })
-    console.log(commentIds);
     const lastBlock = contentState.getLastBlock();
     let fullSelectionState = SelectionState.createEmpty();
     fullSelectionState = fullSelectionState.set('anchorKey', contentState.getFirstBlock().getKey());
@@ -247,7 +250,7 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
   return   <EditorFallback field={field}>
   <DraftailEditor
     ref={editorRef}
-    editorState={forceResetEditorState(editorState)}
+    editorState={editorState}
     onChange={setEditorState}
     placeholder={STRINGS.WRITE_HERE}
     spellCheck={true}
