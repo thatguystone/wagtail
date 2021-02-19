@@ -171,7 +171,7 @@ class FieldLevelCommentWidget {
     });
     initialState.comments.comments.forEach((comment) => {
       // Add annotations for any comments already in the store
-      if (comment.contentpath === widget.contentpath) {
+      if (comment.contentpath === this.contentpath) {
         const annotation = this.getAnnotationForComment(comment);
         this.commentApp.updateAnnotation(annotation, comment.localId);
         annotation.subscribeToUpdates(localId);
