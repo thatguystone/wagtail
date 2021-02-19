@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { DraftailEditor, createEditorStateFromRaw, serialiseEditorStateToRaw } from 'draftail';
-import { EditorState, RichUtils } from 'draft-js';
-import { Provider, useSelector } from 'react-redux';
+import { EditorState, Modifier, RichUtils, SelectionState } from 'draft-js';
+import { shallowEqual, Provider, useSelector } from 'react-redux';
 
 import { IS_IE11, STRINGS } from '../../config/wagtailConfig';
 
@@ -46,10 +46,10 @@ export const wrapWagtailIcon = type => {
   return type;
 };
 
-function forceResetEditorState(editorState) {
+function forceResetEditorState(editorState, replacementContent) {
   return EditorState.set(
     EditorState.createWithContent(
-      editorState.getCurrentContent(),
+      replacementContent ? replacementContent : editorState.getCurrentContent(),
       editorState.getDecorator(),
     ),
     {
@@ -68,23 +68,9 @@ class DraftailInlineAnnotation {
     this.ref = initialRef;
     this.setHidden = null;
     this.setFocused = null;
-    this.onClickHandler = null;
-  }
-  onDelete() {
-  }
-  onFocus() {
   }
   onDecoratorAttached(ref) {
     this.ref = ref;
-  }
-  onUnfocus() {
-  }
-  show() {
-  }
-  hide() {
-  }
-  setOnClickHandler(handler) {
-    this.onClickHandler = handler;
   }
   onClick() {
     if (this.onClickHandler) {
@@ -105,7 +91,7 @@ class DraftailCommentWidget {
     fieldNode
   ) {
     this.fieldNode = fieldNode;
-    this.contentpath = 'test_content_path'; 
+    this.contentpath = window.comments.getContentPath(fieldNode); 
     this.commentsEnabled = false;
     this.annotations = new Map();
     this.makeComment = null;
@@ -141,7 +127,7 @@ class DraftailCommentWidget {
   getSource() {
     const CommentSource = ({ editorState, onComplete }) => {
       useEffect(() => {
-        const annotation = new DraftailInlineAnnotation({current: this.fieldNode}, this.getEditorState, this.setEditorState, this.fieldNode.draftailEditor);
+        const annotation = new DraftailInlineAnnotation({current: this.fieldNode.parentNode}, this.getEditorState, this.setEditorState, this.fieldNode.draftailEditor);
         const commentId = window.commentApp.makeComment(annotation, this.contentpath);
         this.annotations.set(commentId, annotation);
         const nextState = RichUtils.toggleInlineStyle(editorState, `COMMENT-${commentId}`);
@@ -160,11 +146,17 @@ class DraftailCommentWidget {
       const focusedComment = useSelector(window.commentApp.selectors.selectFocused);
       const annotationNode = useRef(null);
       useEffect(() => {
-        window.commentApp.store.getState().comments.comments.get(commentId).annotation.onDecoratorAttached(annotationNode);
+        const comment = window.commentApp.store.getState().comments.comments.get(commentId)
+        if (comment) {
+          comment.annotation.onDecoratorAttached(annotationNode);
+        }
       });
       const onClick = () => {
         window.commentApp.store.dispatch(
           window.commentApp.actions.setFocusedComment(commentId)
+        );
+        window.commentApp.store.dispatch(
+          window.commentApp.actions.setPinnedComment(commentId)
         );
       }
     
@@ -185,7 +177,9 @@ class DraftailCommentWidget {
 
 
 function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, options, enableHorizontalRule}) {
-  const commentWidget = useMemo(() => new DraftailCommentWidget(field))
+  const commentWidget = useMemo(() => new DraftailCommentWidget(field), [field])
+  const commentsSelector = useMemo(() => window.commentApp.utils.selectCommentsForContentPathFactory(commentWidget.contentpath), [commentWidget]);
+  const comments = useSelector(commentsSelector, shallowEqual)
   const enabled = useSelector(window.commentApp.selectors.selectEnabled);
   const commentEntity = {
     type: "COMMENT",
@@ -207,7 +201,35 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
     component: commentWidget.getDecorator(),
   }];
 
-  const [editorState, setEditorState] = useState(() => createEditorStateFromRaw(rawContentState))
+  const [editorState, setEditorState] = useState(() => createEditorStateFromRaw(rawContentState));
+
+  useEffect(() => {
+    const allowedCommentIds = new Set(comments.map((comment) => comment.localId));
+    const commentIds = new Set();
+    let contentState = editorState.getCurrentContent()
+    const blocks = contentState.getBlocksAsArray();
+    blocks.forEach((block) => {
+      block.findStyleRanges(
+        (metadata) => metadata.getStyle().some((style) => style.startsWith('COMMENT')), 
+        (start) => {block.getInlineStyleAt(start).filter((style) => style.startsWith('COMMENT')).forEach((value => commentIds.add(parseInt(value.slice(8)))))})
+    })
+    console.log(commentIds);
+    const lastBlock = contentState.getLastBlock();
+    let fullSelectionState = SelectionState.createEmpty();
+    fullSelectionState = fullSelectionState.set('anchorKey', contentState.getFirstBlock().getKey());
+    fullSelectionState = fullSelectionState.set('focusKey', lastBlock.getKey());
+    fullSelectionState = fullSelectionState.set('anchorOffset', 0);
+    fullSelectionState = fullSelectionState.set('focusOffset', lastBlock.getLength());
+    commentIds.forEach((id) => {
+      if (!allowedCommentIds.has(id)) {
+        contentState = Modifier.removeInlineStyle(contentState, fullSelectionState, 'COMMENT-'+id);
+      }
+    })
+    if (contentState !== editorState.getCurrentContent()) {
+      setEditorState(forceResetEditorState(editorState, contentState));
+    }
+  }, [comments])
+
 
 
   const timeoutRef = useRef();
@@ -240,7 +262,9 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
     // Draft.js + IE 11 presents some issues with pasting rich text. Disable rich paste there.
     stripPastedStyles={IS_IE11}
     {...options}
-    plugins={[commentWidget.getPlugin()]}
+    plugins={[{
+      
+    }]}
     decorators={decorators}
     blockTypes={blockTypes.map(wrapWagtailIcon)}
     inlineStyles={inlineStyles.map(wrapWagtailIcon)}
