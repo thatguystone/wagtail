@@ -46,10 +46,13 @@ export const wrapWagtailIcon = type => {
   return type;
 };
 
-function forceResetEditorState(editorState, replacementContent) {
+function forceResetEditorState({editorState, replacementContent, resetBlockMap}) {
+  const content = replacementContent ? replacementContent : editorState.getCurrentContent()
   return EditorState.set(
     EditorState.createWithContent(
-      replacementContent ? replacementContent : editorState.getCurrentContent(),
+      resetBlockMap ? content.set('blockMap', content.getBlockMap().map(blk =>
+        blk.set('depth', blk.getDepth() + 1)).map(blk =>
+          blk.set('depth', blk.getDepth() + 1))) : content,
       editorState.getDecorator(),
     ),
     {
@@ -165,9 +168,9 @@ class DraftailCommentWidget {
       }
     
       return (
-        <button type="button" className="button unbutton" style={{'text-transform': 'none', 'background-color': (focusedComment !== commentId) ? '#01afb0' : '#007d7e'}} ref={annotationNode} onClick={onClick} data-annotation>
+        <a type="button" ref={annotationNode} onClick={onClick} data-annotation>
           {children}
-        </button>
+        </a>
       )
     }
     return CommentDecorator
@@ -185,6 +188,7 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
   const commentsSelector = useMemo(() => window.commentApp.utils.selectCommentsForContentPathFactory(commentWidget.contentpath), [commentWidget]);
   const comments = useSelector(commentsSelector, shallowEqual)
   const enabled = useSelector(window.commentApp.selectors.selectEnabled);
+  const focusedId = useSelector(window.commentApp.selectors.selectFocused)
   const commentEntity = {
     type: "COMMENT",
     icon: <Icon name="comment"/>,
@@ -229,10 +233,11 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
       }
     })
     if (contentState !== editorState.getCurrentContent()) {
-      setEditorState(forceResetEditorState(editorState, contentState));
+      setEditorState(forceResetEditorState({editorState, replacementContent: contentState}));
     }
   }, [comments])
 
+  useEffect(() => console.log(forceResetEditorState), [])
 
 
   const timeoutRef = useRef();
@@ -270,7 +275,12 @@ function CommentableEditor({plugins, field, editorRef, rawContentState, onSave, 
     }]}
     decorators={decorators}
     blockTypes={blockTypes.map(wrapWagtailIcon)}
-    inlineStyles={inlineStyles.map(wrapWagtailIcon)}
+    inlineStyles={inlineStyles.map(wrapWagtailIcon).concat(comments.map(comment => {return {
+      type: 'COMMENT-' + comment.localId,
+      style: {
+        'background-color': (focusedId !== comment.localId) ? '#01afb0' : '#007d7e'
+      }
+    }}))}
     entityTypes={enabled ? entityTypes.concat(commentEntity) : entityTypes}
     enableHorizontalRule={enableHorizontalRule}
   />
