@@ -96,7 +96,7 @@ function getCommentDecorator(commentApp) {
     const blockKey = children[0].props.block.getKey()
     const start = children[0].props.start
 
-    const commentId = useMemo(() => parseInt(contentState.getBlockForKey(blockKey).getInlineStyleAt(start).find((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER)).slice(8)), [blockKey, start]);
+    const commentId = useMemo(() => parseInt(contentState.getBlockForKey(blockKey).getInlineStyleAt(start).findLast((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER)).slice(8)), [blockKey, start]);
     const annotationNode = useRef(null);
     useEffect(() => {
       // Add a ref to the annotation, allowing the comment to float alongside the attached text.
