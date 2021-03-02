@@ -2,6 +2,7 @@ import functools
 import re
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db.models.fields import CharField, TextField
 from django.forms.formsets import DELETION_FIELD_NAME, ORDERING_FIELD_NAME
@@ -13,6 +14,8 @@ from django.utils.translation import gettext_lazy
 from taggit.managers import TaggableManager
 
 from wagtail.admin import compare, widgets
+from wagtail.admin.forms.comments import CommentForm, CommentReplyForm
+from wagtail.admin.templatetags.wagtailadmin_tags import user_display_name
 from wagtail.core.fields import RichTextField
 from wagtail.core.models import Page
 from wagtail.core.utils import camelcase_to_underscore, resolve_model_string
@@ -59,6 +62,7 @@ def get_form_for_model(
     }
 
     metaclass = type(form_class)
+
     return metaclass(class_name, (form_class,), form_class_attrs)
 
 
@@ -789,8 +793,91 @@ class PrivacyModalPanel(EditHandler):
         )
 
 
+class CommentPanel(EditHandler):
+    def __init__(self, *args, **kwargs):
+        self.comments = []
+        super().__init__(*args, **kwargs)
+
+    def required_formsets(self):
+        # add the comments formset
+        # we need to pass in the current user for validation on the formset
+        # this could alternatively be done on the page form itself if we added the
+        # comments formset there, but we typically only add fields via edit handlers
+        current_user = getattr(self.request, 'user', None)
+
+        class CommentReplyFormWithRequest(CommentReplyForm):
+            user = current_user
+
+        class CommentFormWithRequest(CommentForm):
+            user = current_user
+
+            class Meta:
+                formsets = {
+                    'replies': {
+                        'form': CommentReplyFormWithRequest
+                    }
+                }
+
+        return {
+            'comments': {
+                'form': CommentFormWithRequest,
+                'fields': ['text', 'contentpath'],
+            }
+        }
+
+    template = "wagtailadmin/edit_handlers/comments/comment_panel.html"
+    js_template = "wagtailadmin/edit_handlers/comments/comment_panel.js"
+    declarations_template = "wagtailadmin/edit_handlers/comments/comment_declarations.html"
+
+    def html_declarations(self):
+        return render_to_string(self.declarations_template)
+
+    def on_form_bound(self):
+        comments = []
+        comment_forms = self.form.formsets['comments'].forms
+        for form in comment_forms:
+            instance = form.instance
+            instance.replies = [reply_form.instance for reply_form in form.formsets['replies'].forms]
+            comments.append(instance)
+        self.comments = comments
+
+    def get_context(self):
+        user = getattr(self.request, 'user', None)
+        authors = {user.pk: user_display_name(user)} if user else {}
+        user_pks = {user.pk}
+        serialized_comments = []
+        for comment in self.comments:
+            # iterate over comments to retrieve users (to get display names) and serialized versions
+            user_pks.add(comment.user_id)
+            serialized_comments.append(comment.serializable_data())
+            for reply in comment.replies.all():
+                user_pks.add(reply.user_id)
+
+        authors = {user.pk: user_display_name(user) for user in get_user_model().objects.filter(pk__in=user_pks)}
+
+        comments_data = {
+            'comments': serialized_comments,
+            'user': user.pk,
+            'authors': authors
+        }
+
+        return {
+            'comments_data': comments_data,
+        }
+
+    def render(self):
+        panel = render_to_string(self.template, self.get_context())
+        js = "window.comments.initComments()"
+        return widget_with_script(panel, js)
+
+    def render_js_init(self):
+        return mark_safe(render_to_string(self.js_template, {}))
+
+
 # Now that we've defined EditHandlers, we can set up wagtailcore.Page to have some.
+
 Page.content_panels = [
+    CommentPanel(),
     FieldPanel('title', classname="full title"),
 ]
 

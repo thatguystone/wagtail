@@ -1,7 +1,7 @@
 import { initCommentsApp } from 'wagtail-comment-frontend';
 import { STRINGS } from '../../config/wagtailConfig';
 
-function initComments(initialComments) {
+function initComments() {
   // in case any widgets try to initialise themselves before the comment app,
   // store their initialisations as callbacks to be executed when the comment app
   // itself is finished initialising.
@@ -13,12 +13,16 @@ function initComments(initialComments) {
   };
   document.addEventListener('DOMContentLoaded', () => {
     const commentsElement = document.getElementById('comments');
-    const author = JSON.parse(document.getElementById('comments-author').textContent);
-
-    if (commentsElement && author) {
-      window.commentApp = initCommentsApp(commentsElement, author, initialComments, STRINGS);
-      callbacks.forEach((callback) => { callback(); });
+    const commentsOutputElement = document.getElementById('comments-output');
+    const dataElement = document.getElementById('comments-data');
+    if (!commentsElement || !commentsOutputElement || !dataElement) {
+      throw new Error('Comments app failed to initialise. Missing HTML element');
     }
+    const data = JSON.parse(dataElement.textContent);
+    window.commentApp = initCommentsApp(
+      commentsElement, commentsOutputElement, data.user, data.comments, new Map(Object.entries(data.authors)), STRINGS
+    );
+    callbacks.forEach((callback) => { callback(); });
   });
 }
 
@@ -28,13 +32,13 @@ function getContentPath(fieldNode) {
     return '';
   }
   let element = fieldNode.closest('[data-contentpath]');
-  const contentPaths = [];
+  const contentpaths = [];
   while (element !== null) {
-    contentPaths.push(element.dataset.contentpath);
+    contentpaths.push(element.dataset.contentpath);
     element = element.parentElement.closest('[data-contentpath]');
   }
-  contentPaths.reverse();
-  return contentPaths.join('.');
+  contentpaths.reverse();
+  return contentpaths.join('.');
 }
 
 class BasicFieldLevelAnnotation {
@@ -80,7 +84,7 @@ class FieldLevelCommentWidget {
     annotationTemplateNode
   }) {
     this.fieldNode = fieldNode;
-    this.contentPath = getContentPath(fieldNode);
+    this.contentpath = getContentPath(fieldNode);
     this.commentAdditionNode = commentAdditionNode;
     this.annotationTemplateNode = annotationTemplateNode;
     this.commentNumber = 0;
@@ -88,7 +92,7 @@ class FieldLevelCommentWidget {
   }
   onRegister(makeComment) {
     this.commentAdditionNode.addEventListener('click', () => {
-      makeComment(this.getAnnotationForComment(), this.contentPath);
+      makeComment(this.getAnnotationForComment(), this.contentpath);
     });
   }
   setEnabled(enabled) {
@@ -113,6 +117,7 @@ class FieldLevelCommentWidget {
   getAnnotationForComment() {
     const annotationNode = this.annotationTemplateNode.cloneNode(true);
     annotationNode.id = '';
+    annotationNode.classList.remove('u-hidden');
     this.commentAdditionNode.insertAdjacentElement('afterend', annotationNode);
     return new BasicFieldLevelAnnotation(this.fieldNode, annotationNode);
   }
@@ -124,7 +129,7 @@ function initFieldLevelCommentWidget(fieldElement) {
     commentAdditionNode: fieldElement.querySelector('[data-comment-add]'),
     annotationTemplateNode: document.querySelector('#comment-icon')
   });
-  if (widget.contentPath) {
+  if (widget.contentpath) {
     window.commentApp.registerWidget(widget);
   }
 }
