@@ -69,7 +69,23 @@ function getCommentControl(commentApp, contentPath, fieldNode) {
 }
 
 function findCommentStyleRanges(contentBlock, callback) {
-    contentBlock.findStyleRanges((metadata) => metadata.getStyle().some((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER)), (start, end) => {callback(start, end)})
+    // Find comment style ranges that do not overlap an existing entity
+    const entityRanges = [];
+    contentBlock.findEntityRanges(character => character.getEntity() !== null, (start, end) => entityRanges.push([start, end]));
+    contentBlock.findStyleRanges((metadata) => metadata.getStyle().some((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER)), (start, end) => {
+      const interferingEntityRanges = entityRanges.filter(value => value[1] > start).filter(value => value[0] < end);
+      let currentPosition = start;
+      interferingEntityRanges.forEach((value) => {
+        const [entityStart, entityEnd] = value
+        if (entityStart > currentPosition) {
+          callback(currentPosition, entityStart);
+        }
+        currentPosition = entityEnd;
+      })
+      if (currentPosition < end) {
+        callback(start, end);
+      }
+    })
 }
 
 function getCommentDecorator(commentApp) {
