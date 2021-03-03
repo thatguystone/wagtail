@@ -237,7 +237,15 @@ function CommentableEditor({commentApp, fieldNode, contentPath, rawContentState,
 
     return <DraftailEditor
     ref={editorRef}
-    onChange={setEditorState}
+    onChange={(editorState) => {
+      let newEditorState = editorState;
+      if (['undo', 'redo'].includes(editorState.getLastChangeType())) {
+        const filteredContent = filterInlineStyles(inlineStyles.map(style => style.type).concat(ids.map(id => COMMENT_STYLE_IDENTIFIER + id)), editorState.getCurrentContent());
+        newEditorState = forceResetEditorState(editorState, filteredContent);
+      }
+      setEditorState(newEditorState);
+    }
+    }
     editorState={editorState}
     controls={enabled ? [CommentControl] : []}
     decorators={enabled ? [{
