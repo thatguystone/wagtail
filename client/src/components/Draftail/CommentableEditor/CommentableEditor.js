@@ -164,10 +164,7 @@ function CommentableEditor({commentApp, fieldNode, contentPath, rawContentState,
     const ids = useMemo(() => comments.map(comment => comment.localId), [comments]);
 
     const commentStyles = useMemo(() => ids.map(id => {return {
-      type: COMMENT_STYLE_IDENTIFIER + id,
-      style: enabled ? {
-        'background-color': (focusedId !== id) ? '#01afb0' : '#007d7e'
-      } : {}
+      type: COMMENT_STYLE_IDENTIFIER + id
     }}), [ids, enabled]);
 
     const [uniqueStyleId, setUniqueStyleId] = useState(0)
@@ -225,6 +222,29 @@ function CommentableEditor({commentApp, fieldNode, contentPath, rawContentState,
       component: CommentDecorator 
     }] : []}
     inlineStyles={inlineStyles.concat(commentStyles)}
+    plugins={enabled ? [{
+      customStyleFn: (styleSet) => {
+        const commentStyles = styleSet.filter(style => style.startsWith(COMMENT_STYLE_IDENTIFIER));
+        const numStyles = commentStyles.count();
+        if (numStyles > 0) {
+          // There is at least one comment in the range
+          const commentIds = commentStyles.map(style => parseInt(style.slice(8)));
+          let background = '#01afb0';
+          if (commentIds.has(focusedId)) {
+            // Use the focused colour if one of the comments is focused
+            background = '#007d7e';
+          } else if (numStyles > 1) {
+            // Otherwise if we're in a region with overlapping comments, use a slightly darker colour than usual
+            // to indicate that
+            background = '#01999a';
+          }
+          return {
+            'background-color': background
+          }
+        }
+      }
+    }] : []
+    }
     {...options}
   />
 
