@@ -68,11 +68,12 @@ function getCommentControl(commentApp, contentPath, fieldNode) {
   }
 }
 
-function findCommentStyleRanges(contentBlock, callback) {
+function findCommentStyleRanges(contentBlock, callback, filterFn) {
     // Find comment style ranges that do not overlap an existing entity
+    const filterFunction = filterFn ? filterFn : (metadata) => metadata.getStyle().some((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER))
     const entityRanges = [];
     contentBlock.findEntityRanges(character => character.getEntity() !== null, (start, end) => entityRanges.push([start, end]));
-    contentBlock.findStyleRanges((metadata) => metadata.getStyle().some((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER)), (start, end) => {
+    contentBlock.findStyleRanges(filterFunction, (start, end) => {
       const interferingEntityRanges = entityRanges.filter(value => value[1] > start).filter(value => value[0] < end);
       let currentPosition = start;
       interferingEntityRanges.forEach((value) => {
@@ -96,7 +97,29 @@ function getCommentDecorator(commentApp) {
     const blockKey = children[0].props.block.getKey()
     const start = children[0].props.start
 
-    const commentId = useMemo(() => parseInt(contentState.getBlockForKey(blockKey).getInlineStyleAt(start).findLast((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER)).slice(8)), [blockKey, start]);
+    const commentId = useMemo(() => 
+      {
+        const block = contentState.getBlockForKey(blockKey);
+        const styles = block.getInlineStyleAt(start).filter((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER));
+        let styleToUse;
+        if (styles.count() > 1) {
+          // We're dealing with overlapping comments.
+          // Find the least frequently occurring style and use that - this isn't foolproof, but in most cases should ensure that all comments
+          // have at least one clickable section. This logic is a bit heavier than ideal for a decorator given how often we are forced to
+          // redecorate, but will only be used on overlapping comments
+          const styleFreq = styles.map((style) => {
+            let counter = 0
+            findCommentStyleRanges(block, () => {counter = counter + 1}, (metadata) => metadata.getStyle().some(rangeStyle => rangeStyle === style));
+            return [style, counter]
+          }).sort((a, b) => a[1] - b[1])
+        
+          styleToUse = styleFreq.first()[0];
+
+        } else {
+          styleToUse = styles.first();
+        }
+        return parseInt(styleToUse.slice(8));
+      });
     const annotationNode = useRef(null);
     useEffect(() => {
       // Add a ref to the annotation, allowing the comment to float alongside the attached text.
@@ -218,7 +241,7 @@ function CommentableEditor({commentApp, fieldNode, contentPath, rawContentState,
     editorState={editorState}
     controls={enabled ? [CommentControl] : []}
     decorators={enabled ? [{
-      strategy: findCommentStyleRanges,
+      strategy: (block, callback) => findCommentStyleRanges(block, callback),
       component: CommentDecorator 
     }] : []}
     inlineStyles={inlineStyles.concat(commentStyles)}
