@@ -6,14 +6,15 @@
 # IT Management <hudan@itmanagement.cz>, 2018
 # IT Management <hudan@itmanagement.cz>, 2020
 # Jiri Stepanek <stepiiicz@gmail.com>, 2015
+# Krystof Pilnacek <krystof.pilnacek@rossum.ai>, 2020
 # Mirek Zvolský <zvolsky@seznam.cz>, 2020
 # Mořeplavec <stanislav.vasko@gmail.com>, 2017
 msgid ""
 msgstr ""
 "Project-Id-Version: Wagtail\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-10-23 12:34+0100\n"
-"PO-Revision-Date: 2020-10-23 11:36+0000\n"
+"POT-Creation-Date: 2021-01-18 17:31+0000\n"
+"PO-Revision-Date: 2021-01-18 17:32+0000\n"
 "Last-Translator: Matt Westcott <matthew@torchbox.com>\n"
 "Language-Team: Czech (http://www.transifex.com/torchbox/wagtail/language/"
 "cs/)\n"
@@ -284,11 +285,8 @@ msgstr ""
 msgid "Sorry, upload failed."
 msgstr "Nahrání na server selhalo."
 
-msgid "Update"
-msgstr "Aktualizovat"
-
-msgid "Delete"
-msgstr "Smazat"
+msgid "Document updated."
+msgstr "Dokument upraven."
 
 msgid "You need a password to access this document."
 msgstr "Pro přístup k tomuto dokumentu potřebujete heslo."
@@ -322,6 +320,9 @@ msgid ""
 msgstr ""
 "Zdrojový soubor dokumentu není možné nalézt. Prosím změňte zdroj nebo "
 "dokument smažte."
+
+msgid "Delete"
+msgstr "Smazat"
 
 msgid "Document '{0}' deleted."
 msgstr "Dokument '{0}' byl smazán."

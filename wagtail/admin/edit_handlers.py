@@ -885,9 +885,11 @@ Page.promote_panels = [
     MultiFieldPanel([
         FieldPanel('slug'),
         FieldPanel('seo_title'),
-        FieldPanel('show_in_menus'),
         FieldPanel('search_description'),
-    ], gettext_lazy('Common page configuration')),
+    ], gettext_lazy('For search engines')),
+    MultiFieldPanel([
+        FieldPanel('show_in_menus'),
+    ], gettext_lazy('For site menus')),
 ]
 
 Page.settings_panels = [
@@ -941,9 +943,6 @@ class StreamFieldPanel(FieldPanel):
 
         return classes
 
-    def html_declarations(self):
-        return self.block_def.all_html_declarations()
-
     def get_comparison_class(self):
         return compare.StreamFieldComparison
 
@@ -951,7 +950,3 @@ class StreamFieldPanel(FieldPanel):
         # a StreamField may consist of many input fields, so it's not meaningful to
         # attach the label to any specific one
         return ""
-
-    def on_model_bound(self):
-        super().on_model_bound()
-        self.block_def = self.db_field.stream_block

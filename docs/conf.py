@@ -19,6 +19,8 @@ from datetime import datetime
 
 import django
 
+from recommonmark.transform import AutoStructify
+
 from wagtail import VERSION, __version__
 
 
@@ -54,6 +56,7 @@ os.environ['DATABASE_ENGINE'] = 'django.db.backends.sqlite3'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
+    'recommonmark',
 ]
 
 if not on_rtd:
@@ -163,7 +166,7 @@ html_static_path = ['_static']
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
 # directly to the root of the documentation.
-# html_extra_path = []
+html_extra_path = ['robots.txt']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -184,7 +187,10 @@ html_static_path = ['_static']
 # html_domain_indices = True
 
 # If false, no index is generated.
-# html_use_index = True
+# Since we are implementing search with Algolia DocSearch, we do not need Sphinx to
+# generate its own index. It might not hurt to keep the Sphinx index, but it
+# could potentially speed up the build process.
+html_use_index = False
 
 # If true, the index is split into individual pages for each letter.
 # html_split_index = False
@@ -300,3 +306,10 @@ texinfo_documents = [
 def setup(app):
     app.add_css_file('css/custom.css')
     app.add_js_file('js/banner.js')
+
+    github_doc_root = 'https://github.com/wagtail/wagtail/tree/main/docs/'
+
+    app.add_config_value('recommonmark_config', {
+        'url_resolver': lambda url: github_doc_root + url,
+    }, True)
+    app.add_transform(AutoStructify)

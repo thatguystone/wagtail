@@ -69,7 +69,8 @@ def register_custom_search_area():
     return MyCustomSearchArea(
         'My Search',
         '/customsearch/',
-        classnames='icon icon-custom',
+        classnames='search--custom-class',
+        icon_name='custom',
         attrs={'is-custom': 'true'},
         order=10000)
 
@@ -135,6 +136,11 @@ class PanicMenuItem(ActionMenuItem):
 @hooks.register('register_page_action_menu_item')
 def register_panic_menu_item():
     return PanicMenuItem()
+
+
+@hooks.register('register_page_action_menu_item')
+def register_none_menu_item():
+    return None
 
 
 class RelaxMenuItem(ActionMenuItem):

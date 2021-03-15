@@ -1,5 +1,7 @@
 import os
 
+from django.utils.translation import gettext_lazy as _
+
 
 DEBUG = False
 WAGTAIL_ROOT = os.path.dirname(os.path.dirname(__file__))
@@ -12,22 +14,28 @@ TIME_ZONE = 'Asia/Tokyo'
 DATABASES = {
     'default': {
         'ENGINE': os.environ.get('DATABASE_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.environ.get('DATABASE_NAME', 'wagtail'),
-        'USER': os.environ.get('DATABASE_USER', None),
-        'PASSWORD': os.environ.get('DATABASE_PASS', None),
-        'HOST': os.environ.get('DATABASE_HOST', None),
+        'NAME': os.environ.get('DATABASE_NAME', ':memory:'),
+        'USER': os.environ.get('DATABASE_USER', ''),
+        'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
+        'HOST': os.environ.get('DATABASE_HOST', ''),
+        'PORT': os.environ.get('DATABASE_PORT', ''),
 
         'TEST': {
-            'NAME': os.environ.get('DATABASE_NAME', None),
+            'NAME': os.environ.get('DATABASE_NAME', '')
         }
     }
 }
 
+# Set regular database name when a non-SQLite db is used
+if DATABASES['default']['ENGINE'] != 'django.db.backends.sqlite3':
+    DATABASES['default']['NAME'] = os.environ.get('DATABASE_NAME', 'wagtail')
+
 # Add extra options when mssql is used (on for example appveyor)
 if DATABASES['default']['ENGINE'] == 'sql_server.pyodbc':
     DATABASES['default']['OPTIONS'] = {
-        'driver': 'SQL Server Native Client 11.0',
+        'driver': os.environ.get('DATABASE_DRIVER', 'SQL Server Native Client 11.0'),
         'MARS_Connection': 'True',
+        'host_is_server': True,  # Applies to FreeTDS driver only
     }
 
 
@@ -227,10 +235,9 @@ WAGTAILADMIN_RICH_TEXT_EDITORS = {
     },
 }
 
-
 WAGTAIL_CONTENT_LANGUAGES = [
-    ("en", "English"),
-    ("fr", "French"),
+    ("en", _("English")),
+    ("fr", _("French")),
 ]
 
 

@@ -67,9 +67,9 @@ The database backend is very basic and is intended only to be used in developmen
 
 It also doesn't support:
 
- - Searching on fields in subclasses of ``Page`` (unless the class is being searched directly)
- - :ref:`wagtailsearch_indexing_callable_fields`
- - Converting accented characters to ASCII
+- Searching on fields in subclasses of ``Page`` (unless the class is being searched directly)
+- :ref:`wagtailsearch_indexing_callable_fields`
+- Converting accented characters to ASCII
 
 If any of these features are important to you, we recommend using Elasticsearch instead.
 
@@ -180,7 +180,7 @@ If you prefer not to run an Elasticsearch server in development or production, t
 -  Run ``./manage.py update_index``
 
 .. _elasticsearch-py: https://elasticsearch-py.readthedocs.org
-.. _Bonsai: https://bonsai.io/signup
+.. _Bonsai: https://bonsai.io/
 
 Amazon AWS Elasticsearch
 ~~~~~~~~~~~~~~~~~~~~~~~~

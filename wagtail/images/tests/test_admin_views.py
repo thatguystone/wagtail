@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils.http import RFC3986_SUBDELIMS, urlquote
 
-from wagtail.core.models import Collection, GroupCollectionPermission
+from wagtail.core.models import Collection, GroupCollectionPermission, get_root_collection_id
 from wagtail.images.models import UploadedImage
 from wagtail.images.utils import generate_signature
 from wagtail.tests.testapp.models import CustomImage, CustomImageWithAuthor
@@ -824,6 +824,82 @@ class TestImageChooserView(TestCase, WagtailTestUtils):
         # "Eviler Plans" should be prefixed with &#x21b3 (↳) and 4 non-breaking spaces.
         self.assertContains(response, '&nbsp;&nbsp;&nbsp;&nbsp;&#x21b3 Eviler plans')
 
+    def test_choose_permissions(self):
+        # Create group with access to admin and Chooser permission on one Collection, but not another.
+        bakers_group = Group.objects.create(name='Bakers')
+        access_admin_perm = Permission.objects.get(
+            content_type__app_label='wagtailadmin',
+            codename='access_admin'
+        )
+        bakers_group.permissions.add(access_admin_perm)
+        # Create the "Bakery" Collection and grant "choose" permission to the Bakers group.
+        root = Collection.objects.get(id=get_root_collection_id())
+        bakery_collection = root.add_child(instance=Collection(name='Bakery'))
+        GroupCollectionPermission.objects.create(
+            group=bakers_group,
+            collection=bakery_collection,
+            permission=Permission.objects.get(
+                content_type__app_label='wagtailimages',
+                codename='choose_image'
+            )
+        )
+        # Create the "Office" Collection and _don't_ grant any permissions to the Bakers group.
+        office_collection = root.add_child(instance=Collection(name='Office'))
+
+        # Create a new user in the Bakers group, and log in as them.
+        # Can't use self.user because it's a superuser.
+        baker = self.create_user(username='baker', password='password')
+        baker.groups.add(bakers_group)
+        self.login(username='baker', password='password')
+
+        # Add an image to each Collection.
+        sweet_buns = Image.objects.create(
+            title='SweetBuns.jpg',
+            file=get_test_image_file(),
+            collection=bakery_collection,
+        )
+        poster = Image.objects.create(
+            title='PromotionalPoster.jpg',
+            file=get_test_image_file(),
+            collection=office_collection,
+        )
+
+        # Open the image chooser
+        response = self.get()
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'wagtailimages/chooser/chooser.html')
+
+        # Confirm that the Baker can see the sweet buns, but not the promotional poster.
+        self.assertContains(response, sweet_buns.title)
+        self.assertNotContains(response, poster.title)
+
+        # Confirm that the Collection chooser is not visible, because the Baker cannot
+        # choose from multiple Collections.
+        self.assertNotContains(response, 'Collection:')
+
+        # We now let the Baker choose from the Office collection.
+        GroupCollectionPermission.objects.create(
+            group=Group.objects.get(name='Bakers'),
+            collection=Collection.objects.get(name='Office'),
+            permission=Permission.objects.get(
+                content_type__app_label='wagtailimages',
+                codename='choose_image'
+            )
+        )
+
+        # Open the image chooser again.
+        response = self.get()
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'wagtailimages/chooser/chooser.html')
+
+        # Confirm that the Baker can now see both images.
+        self.assertContains(response, sweet_buns.title)
+        self.assertContains(response, poster.title)
+
+        # Ensure that the Collection chooser IS visible, because the Baker can now
+        # choose from multiple Collections.
+        self.assertContains(response, 'Collection:')
+
     @override_settings(WAGTAILIMAGES_IMAGE_MODEL='tests.CustomImage')
     def test_with_custom_image_model(self):
         response = self.get()
@@ -958,9 +1034,19 @@ class TestImageChooserSelectFormatView(TestCase, WagtailTestUtils):
         response = self.get(params={'alt_text': "some previous alt text"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value=\\"some previous alt text\\"')
+        self.assertNotContains(response, 'id=\\"id_image-chooser-insertion-image_is_decorative\\" checked')
+
+    def test_with_edit_params_no_alt_text_marks_as_decorative(self):
+        response = self.get(params={'alt_text': ""})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id=\\"id_image-chooser-insertion-image_is_decorative\\" checked')
 
     def test_post_response(self):
-        response = self.post({'image-chooser-insertion-format': 'left', 'image-chooser-insertion-alt_text': 'Arthur "two sheds" Jackson'})
+        response = self.post({
+            'image-chooser-insertion-format': 'left',
+            'image-chooser-insertion-image_is_decorative': False,
+            'image-chooser-insertion-alt_text': 'Arthur "two sheds" Jackson',
+        })
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
@@ -974,6 +1060,27 @@ class TestImageChooserSelectFormatView(TestCase, WagtailTestUtils):
         self.assertEqual(result['format'], 'left')
         self.assertEqual(result['alt'], 'Arthur "two sheds" Jackson')
         self.assertIn('alt="Arthur &quot;two sheds&quot; Jackson"', result['html'])
+
+    def test_post_response_image_is_decorative_discards_alt_text(self):
+        response = self.post({
+            'image-chooser-insertion-format': 'left',
+            'image-chooser-insertion-alt_text': 'Arthur "two sheds" Jackson',
+            'image-chooser-insertion-image_is_decorative': True,
+        })
+        response_json = json.loads(response.content.decode())
+        result = response_json['result']
+
+        self.assertEqual(result['alt'], '')
+        self.assertIn('alt=""', result['html'])
+
+    def test_post_response_image_is_not_decorative_missing_alt_text(self):
+        response = self.post({
+            'image-chooser-insertion-format': 'left',
+            'image-chooser-insertion-alt_text': '',
+            'image-chooser-insertion-image_is_decorative': False,
+        })
+        response_json = json.loads(response.content.decode())
+        self.assertIn('Please add some alt text for your image or mark it as decorative', response_json['html'])
 
 
 class TestImageChooserUploadView(TestCase, WagtailTestUtils):
@@ -1233,7 +1340,7 @@ class TestMultipleImageUploader(TestCase, WagtailTestUtils):
         # Check response
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
-        self.assertTemplateUsed(response, 'wagtailimages/multiple/edit_form.html')
+        self.assertTemplateUsed(response, 'wagtailadmin/generic/multiple_upload/edit_form.html')
 
         # Check image
         self.assertIn('image', response.context)
@@ -1381,7 +1488,7 @@ class TestMultipleImageUploader(TestCase, WagtailTestUtils):
         # Check response
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
-        self.assertTemplateUsed(response, 'wagtailimages/multiple/edit_form.html')
+        self.assertTemplateUsed(response, 'wagtailadmin/generic/multiple_upload/edit_form.html')
 
         # Check that a form error was raised
         self.assertFormError(response, 'form', 'title', "This field is required.")
@@ -1478,7 +1585,7 @@ class TestMultipleImageUploaderWithCustomImageModel(TestCase, WagtailTestUtils):
         # Check response
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
-        self.assertTemplateUsed(response, 'wagtailimages/multiple/edit_form.html')
+        self.assertTemplateUsed(response, 'wagtailadmin/generic/multiple_upload/edit_form.html')
 
         # Check image
         self.assertIn('image', response.context)
@@ -1551,7 +1658,7 @@ class TestMultipleImageUploaderWithCustomImageModel(TestCase, WagtailTestUtils):
         # Check response
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
-        self.assertTemplateUsed(response, 'wagtailimages/multiple/edit_form.html')
+        self.assertTemplateUsed(response, 'wagtailadmin/generic/multiple_upload/edit_form.html')
 
     def test_edit_post(self):
         """
@@ -1606,7 +1713,7 @@ class TestMultipleImageUploaderWithCustomImageModel(TestCase, WagtailTestUtils):
         # Check response
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
-        self.assertTemplateUsed(response, 'wagtailimages/multiple/edit_form.html')
+        self.assertTemplateUsed(response, 'wagtailadmin/generic/multiple_upload/edit_form.html')
 
         response_json = json.loads(response.content.decode())
         # Check JSON
@@ -1691,7 +1798,7 @@ class TestMultipleImageUploaderWithCustomRequiredFields(TestCase, WagtailTestUti
         # Check response
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
-        self.assertTemplateUsed(response, 'wagtailimages/multiple/edit_form.html')
+        self.assertTemplateUsed(response, 'wagtailadmin/generic/multiple_upload/edit_form.html')
 
         # Check image
         self.assertIn('uploaded_image', response.context)
@@ -1826,7 +1933,7 @@ class TestMultipleImageUploaderWithCustomRequiredFields(TestCase, WagtailTestUti
         self.assertEqual(response['Content-Type'], 'application/json')
 
         # Make sure the image is deleted
-        self.assertFalse(CustomImageWithAuthor.objects.filter(id=self.uploaded_image.id).exists())
+        self.assertFalse(UploadedImage.objects.filter(id=self.uploaded_image.id).exists())
 
         # Check JSON
         response_json = json.loads(response.content.decode())

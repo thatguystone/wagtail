@@ -4,14 +4,14 @@
 #
 # Translators:
 # Jim Brouzoulis <jim.brouzoulis@chalmers.se>, 2017
-# Martin Sandström <martin@marteinn.se>, 2020
+# Martin Sandström <martin@marteinn.se>, 2020-2021
 # Philip Andersen <renegadevi@codeofmagi.net>, 2018-2019
 msgid ""
 msgstr ""
 "Project-Id-Version: Wagtail\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-10-23 12:34+0100\n"
-"PO-Revision-Date: 2020-10-25 06:10+0000\n"
+"POT-Creation-Date: 2021-01-18 17:31+0000\n"
+"PO-Revision-Date: 2021-02-02 19:28+0000\n"
 "Last-Translator: Martin Sandström <martin@marteinn.se>\n"
 "Language-Team: Swedish (http://www.transifex.com/torchbox/wagtail/language/"
 "sv/)\n"
@@ -31,10 +31,16 @@ msgid "Add/edit documents you own"
 msgstr "Lägg till/redigera dokument du äger"
 
 msgid "Edit"
-msgstr "Editera"
+msgstr "Redigera"
 
 msgid "Edit any document"
 msgstr "Redigera alla dokument"
+
+msgid "Choose"
+msgstr "Välj"
+
+msgid "Select documents in choosers"
+msgstr "Markera dokument i väljare"
 
 msgid "title"
 msgstr "titel"
@@ -145,10 +151,10 @@ msgstr "Nej, radera inte."
 
 #, python-format
 msgid "Editing %(title)s"
-msgstr "Editerar %(title)s"
+msgstr "Redigerar %(title)s"
 
 msgid "Editing"
-msgstr "Editerar"
+msgstr "Redigerar"
 
 msgid "Save"
 msgstr "Spara"
@@ -214,7 +220,7 @@ msgid "Status"
 msgstr "Status"
 
 msgid "Edit this page"
-msgstr "Editera denna sida"
+msgstr "Redigera denna sida"
 
 #, python-format
 msgid ""
@@ -266,12 +272,6 @@ msgstr "Ledsen, uppladdningen misslyckades."
 msgid "Document updated."
 msgstr "Dokument uppdaterat."
 
-msgid "Update"
-msgstr "Uppdatera"
-
-msgid "Delete"
-msgstr "Radera"
-
 msgid "You need a password to access this document."
 msgstr "Du behöver ett lösenord för få åtkomst till dokumentet."
 
@@ -304,6 +304,9 @@ msgid ""
 "The file could not be found. Please change the source or delete the document"
 msgstr ""
 "Filen kunde inte hittas. Vänligen ändra källan eller ta bort dokumentet."
+
+msgid "Delete"
+msgstr "Radera"
 
 msgid "Document '{0}' deleted."
 msgstr "Dokument '{0}' borttaget."

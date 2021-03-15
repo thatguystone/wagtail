@@ -106,6 +106,10 @@ You can create migrations for the test app by running the following from the Wag
 Testing against PostgreSQL
 --------------------------
 
+.. note::
+
+   In order to run these tests, you must install the required modules for PostgreSQL as described in Django's `Databases documentation`_.
+
 By default, Wagtail tests against SQLite. You can switch to using PostgreSQL by
 using the ``--postgres`` argument:
 
@@ -113,10 +117,14 @@ using the ``--postgres`` argument:
 
     $ python runtests.py --postgres
 
-If you need to use a different user, password or host. Use the ``PGUSER``, ``PGPASSWORD`` and ``PGHOST`` environment variables.
+If you need to use a different user, password, host or port, use the ``PGUSER``, ``PGPASSWORD``, ``PGHOST`` and ``PGPORT`` environment variables respectively.
 
 Testing against a different database
 ------------------------------------
+
+.. note::
+
+   In order to run these tests, you must install the required client libraries and modules for the given database as described in Django's `Databases`_ documentation or 3rd-party database backend's documentation.
 
 If you need to test against a different database, set the ``DATABASE_ENGINE``
 environment variable to the name of the Django database backend to test against:
@@ -127,6 +135,19 @@ environment variable to the name of the Django database backend to test against:
 
 This will create a new database called ``test_wagtail`` in MySQL and run
 the tests against it.
+
+If you need to use different connection settings, use the following environment variables which correspond to the respective keys within Django's `DATABASES`_ settings dictionary:
+
+* ``DATABASE_ENGINE``
+* ``DATABASE_NAME``
+* ``DATABASE_PASSWORD``
+* ``DATABASE_HOST``
+
+  * Note that for MySQL, this must be ``127.0.0.1`` rather than ``localhost`` if you need to connect using a TCP socket
+
+* ``DATABASE_PORT``
+
+It is also possible to set ``DATABASE_DRIVER``, which corresponds to the `driver` value within `OPTIONS` if an SQL Server engine is used.
 
 Testing Elasticsearch
 ---------------------
@@ -236,7 +257,7 @@ The Wagtail documentation is built by Sphinx. To install Sphinx and compile the 
 
     $ cd /path/to/wagtail
     $ # Install the documentation dependencies
-    $ pip install -e .[docs]
+    $ pip install -e '.[docs]'
     $ # Compile the docs
     $ cd docs/
     $ make html
@@ -272,3 +293,5 @@ To do this, you can run the following command to see the changes automatically a
     $ make livehtml
 
 
+.. _Databases documentation: https://docs.djangoproject.com/en/stable/ref/databases/
+.. _DATABASES: https://docs.djangoproject.com/en/stable/ref/settings/#databases

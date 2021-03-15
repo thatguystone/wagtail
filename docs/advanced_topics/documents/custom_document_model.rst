@@ -9,10 +9,10 @@ additional fields.
 
 You need to complete the following steps in your project to do this:
 
- - Create a new document model that inherits from
-   ``wagtail.documents.models.AbstractDocument``. This is where you would
-   add additional fields.
- - Point ``WAGTAILDOCS_DOCUMENT_MODEL`` to the new model.
+- Create a new document model that inherits from
+  ``wagtail.documents.models.AbstractDocument``. This is where you would
+  add additional fields.
+- Point ``WAGTAILDOCS_DOCUMENT_MODEL`` to the new model.
 
 Here's an example:
 
@@ -25,8 +25,6 @@ Here's an example:
         # Custom field example:
         source = models.CharField(
             max_length=255,
-            # This must be set to allow Wagtail to create a document instance
-            # on upload.
             blank=True,
             null=True
         )
@@ -36,12 +34,9 @@ Here's an example:
             'source',
         )
 
-.. note::
+.. versionchanged:: 2.12
 
-    Fields defined on a custom document model must either be set as non-required
-    (``blank=True``), or specify a default value. This is because uploading the
-    document and entering custom data happens as two separate actions. Wagtail
-    needs to be able to create a document record immediately on upload.
+    Fields on a custom document model can now be defined as required (``blank=False``).
 
 Then in your settings module:
 

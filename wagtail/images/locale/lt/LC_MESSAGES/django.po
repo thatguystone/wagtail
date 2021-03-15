@@ -4,12 +4,13 @@
 #
 # Translators:
 # Matas Dailyda <matas@dailyda.com>, 2017-2018
+# Naglis Jonaitis, 2021
 msgid ""
 msgstr ""
 "Project-Id-Version: Wagtail\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-10-23 12:34+0100\n"
-"PO-Revision-Date: 2020-01-20 20:14+0000\n"
+"POT-Creation-Date: 2021-01-18 17:30+0000\n"
+"PO-Revision-Date: 2021-01-18 17:32+0000\n"
 "Last-Translator: Matt Westcott <matthew@torchbox.com>\n"
 "Language-Team: Lithuanian (http://www.transifex.com/torchbox/wagtail/"
 "language/lt/)\n"
@@ -20,6 +21,12 @@ msgstr ""
 "Plural-Forms: nplurals=4; plural=(n % 10 == 1 && (n % 100 > 19 || n % 100 < "
 "11) ? 0 : (n % 10 >= 2 && n % 10 <=9) && (n % 100 > 19 || n % 100 < 11) ? "
 "1 : n % 1 != 0 ? 2: 3);\n"
+
+msgid "Wagtail images"
+msgstr "Wagtail paveikslėliai"
+
+msgid "GIF, JPEG, PNG, WEBP"
+msgstr "GIF, JPEG, PNG, WEBP"
 
 #, python-format
 msgid ""
@@ -184,6 +191,19 @@ msgstr "Redagavimas"
 msgid "URL Generator"
 msgstr "URL generatorius"
 
+msgid "Focal point"
+msgstr "Svarbiausias taškas"
+
+msgid "(optional)"
+msgstr "(nebūtina)"
+
+msgid ""
+"To define this image's most important region, drag a box over the image "
+"above."
+msgstr ""
+"Kad nustatyti svarbiausią paveiksliuko zoną, apibrėžkite ją stačiakampiu "
+"aukščiau esančiame paveiksliuke."
+
 msgid "Current focal point shown"
 msgstr "Rodomas dabartinis svarbiausias taškas"
 
@@ -204,6 +224,12 @@ msgstr "Panaudojimas"
 
 msgid "Images"
 msgstr "Paveiksliukai"
+
+msgid "Popular Tags:"
+msgstr "Populiarios žymenos:"
+
+msgid "Clear choice"
+msgstr "Išvalyti pasirinkimus"
 
 #, python-format
 msgid "Sorry, no images match \"<em>%(query_string)s</em>\""
@@ -303,12 +329,6 @@ msgstr ""
 msgid "Image updated."
 msgstr "Paveiksliukai atnaujinti."
 
-msgid "Update"
-msgstr "Atnaujinti"
-
-msgid "Delete"
-msgstr "Ištrinti"
-
 msgid "Image permissions"
 msgstr "Paveiksliuko leidimai"
 
@@ -333,6 +353,9 @@ msgid ""
 msgstr ""
 "Paveiksliuko šaltinio byla nebuvo rasta. Prašome pakeisti šaltinį arba "
 "ištrinti paveiksliuką."
+
+msgid "Delete"
+msgstr "Ištrinti"
 
 msgid "Image '{0}' deleted."
 msgstr "Paveiksliukas '{0}' ištrintas."

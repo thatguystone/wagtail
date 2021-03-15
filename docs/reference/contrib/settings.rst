@@ -214,7 +214,7 @@ You can store the settings instance in a variable to save some typing, if you ha
 
     {% with social_settings=settings("app_label.SocialMediaSettings") %}
         Follow us on Twitter at @{{ social_settings.twitter }},
-        or Instagram at @{{ social_settings.Instagram }}.
+        or Instagram at @{{ social_settings.instagram }}.
     {% endwith %}
 
 Or, alternately, using the ``set`` tag:
@@ -271,8 +271,6 @@ and two more to fetch each page):
 
 Utilising the ``page_url`` setting shortcut
 -------------------------------------------
-
-.. versionadded:: 2.10
 
 If, like in the previous section, your settings model references pages,
 and you regularly need to output the URLs of those pages in your project,

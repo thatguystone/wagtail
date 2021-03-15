@@ -23,7 +23,7 @@ install_requires = [
     "Django>=2.2,<3.2",
     "django-modelcluster>=5.1,<6.0",
     "django-taggit>=1.0,<2.0",
-    "django-treebeard>=4.2.0,<5.0",
+    "django-treebeard>=4.2.0,<5.0,!=4.5",
     "djangorestframework>=3.11.1,<4.0",
     "django-filter>=2.2,<3.0",
     "draftjs_exporter>=2.1.5,<3.0",
@@ -36,6 +36,7 @@ install_requires = [
     "xlsxwriter>=1.2.8,<2.0",
     "tablib[xls,xlsx]>=0.14.0",
     "anyascii>=0.1.5",
+    "telepath>=0.1,<1",
 ]
 
 # Testing dependencies
@@ -44,7 +45,7 @@ testing_extras = [
     'python-dateutil>=2.2',
     'pytz>=2014.7',
     'elasticsearch>=5.0,<6.0',
-    'Jinja2>=2.8,<3.0',
+    'Jinja2>=2.11,<3.0',
     'boto3>=1.16,<1.17',
     'freezegun>=0.3.8',
     'openpyxl>=2.6.4',
@@ -76,6 +77,7 @@ documentation_extras = [
     'Sphinx>=1.5.2',
     'sphinx-autobuild>=0.6.0',
     'sphinx_rtd_theme>=0.1.9',
+    'recommonmark>=0.7.1',
 ]
 
 setup(

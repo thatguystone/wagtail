@@ -10,7 +10,6 @@ from wagtail.admin.forms.search import SearchForm
 from wagtail.admin.modal_workflow import render_modal_workflow
 from wagtail.admin.models import popular_tags_for_model
 from wagtail.core import hooks
-from wagtail.core.models import Collection
 from wagtail.images import get_image_model
 from wagtail.images.formats import get_image_format
 from wagtail.images.forms import ImageInsertionForm, get_image_form
@@ -55,7 +54,9 @@ def get_image_result_data(image):
 def get_chooser_context(request):
     """Helper function to return common template context variables for the main chooser view"""
 
-    collections = Collection.objects.all()
+    collections = permission_policy.collections_user_has_permission_for(
+        request.user, 'choose'
+    )
     if len(collections) < 2:
         collections = None
 
@@ -78,7 +79,9 @@ def chooser(request):
     else:
         uploadform = None
 
-    images = Image.objects.order_by('-created_at')
+    images = permission_policy.instances_user_has_any_permission_for(
+        request.user, ['choose']
+    ).order_by('-created_at')
 
     # allow hooks to modify the queryset
     for hook in hooks.get_hooks('construct_image_chooser_queryset'):
@@ -238,6 +241,9 @@ def chooser_select_format(request, image_id):
     else:
         initial = {'alt_text': image.default_alt_text}
         initial.update(request.GET.dict())
+        # If you edit an existing image, and there is no alt text, ensure that
+        # "image is decorative" is ticked when you open the form
+        initial['image_is_decorative'] = initial['alt_text'] == ''
         form = ImageInsertionForm(initial=initial, prefix='image-chooser-insertion')
 
     return render_modal_workflow(

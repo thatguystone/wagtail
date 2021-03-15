@@ -47,9 +47,9 @@ export const getPageChildren: GetPageChildren = (id, options = {}) => {
   let url = `${ADMIN_API.PAGES}?child_of=${id}&for_explorer=1`;
 
   if (options.fields) {
-    url += `&fields=parent,translations,${window.encodeURIComponent(options.fields.join(','))}`;
+    url += `&fields=parent,${window.encodeURIComponent(options.fields.join(','))}`;
   } else {
-    url += '&fields=parent,translations';
+    url += '&fields=parent';
   }
 
   if (options.onlyWithChildren) {
@@ -68,6 +68,7 @@ export const getPageChildren: GetPageChildren = (id, options = {}) => {
 interface GetPageTranslationsOptions {
   fields?: string[];
   onlyWithChildren?: boolean;
+  offset?: number;
 }
 type GetPageTranslations = (id: number, options: GetPageTranslationsOptions) => Promise<WagtailPageListAPI>;
 export const getPageTranslations: GetPageTranslations = (id, options = {}) => {
@@ -83,5 +84,29 @@ export const getPageTranslations: GetPageTranslations = (id, options = {}) => {
     url += '&has_children=1';
   }
 
+  if (options.offset) {
+    url += `&offset=${options.offset}`;
+  }
+
   return get(url);
+};
+
+interface GetAllPageTranslationsOptions {
+  fields?: string[];
+  onlyWithChildren?: boolean;
+}
+
+export const getAllPageTranslations = async (id: number, options: GetAllPageTranslationsOptions) => {
+  const items: WagtailPageAPI[] = [];
+  let iterLimit = 100;
+
+  for (;;) {
+    const page = await getPageTranslations(id, { offset: items.length, ...options });
+
+    page.items.forEach(item => items.push(item));
+
+    if (items.length >= page.meta.total_count || iterLimit-- <= 0) {
+      return items;
+    }
+  }
 };

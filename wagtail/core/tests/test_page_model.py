@@ -944,6 +944,128 @@ class TestLiveRevision(TestCase):
             )
 
 
+class TestPageGetSpecific(TestCase):
+    fixtures = ['test.json']
+
+    def setUp(self):
+        super().setUp()
+        self.page = Page.objects.get(url_path="/home/about-us/")
+        self.page.foo = 'ABC'
+        self.page.bar = {'key': 'value'}
+        self.page.baz = 999
+
+    def test_default(self):
+        # Field values are fetched from the database, hence the query
+        with self.assertNumQueries(1):
+            result = self.page.get_specific()
+
+        # The returned instance is the correct type
+        self.assertIsInstance(result, SimplePage)
+
+        # Generic page field values can be accessed for free
+        with self.assertNumQueries(0):
+            self.assertEqual(result.id, self.page.id)
+            self.assertEqual(result.title, self.page.title)
+
+        # Specific model fields values are available without additional queries
+        with self.assertNumQueries(0):
+            self.assertTrue(result.content)
+
+        # All non-field attributes should have been copied over...
+        for attr in ('foo', 'bar', 'baz'):
+            with self.subTest(attribute=attr):
+                self.assertIs(getattr(result, attr), getattr(self.page, attr))
+
+    def test_deferred(self):
+        # Field values are NOT fetched from the database, hence no query
+        with self.assertNumQueries(0):
+            result = self.page.get_specific(deferred=True)
+
+        # The returned instance is the correct type
+        self.assertIsInstance(result, SimplePage)
+
+        # Generic page field values can be accessed for free
+        with self.assertNumQueries(0):
+            self.assertEqual(result.id, self.page.id)
+            self.assertEqual(result.title, self.page.title)
+
+        # But, specific model fields values are NOT available without additional queries
+        with self.assertNumQueries(1):
+            self.assertTrue(result.content)
+
+        # All non-field attributes should have been copied over...
+        for attr in ('foo', 'bar', 'baz'):
+            with self.subTest(attribute=attr):
+                self.assertIs(getattr(result, attr), getattr(self.page, attr))
+
+    def test_copy_attrs(self):
+        result = self.page.get_specific(copy_attrs=['foo', 'bar'])
+
+        # foo and bar should have been copied over
+        self.assertIs(result.foo, self.page.foo)
+        self.assertIs(result.bar, self.page.bar)
+
+        # but baz should not have been
+        self.assertFalse(hasattr(result, 'baz'))
+
+    def test_copy_attrs_with_empty_list(self):
+        result = self.page.get_specific(copy_attrs=())
+
+        # No non-field attributes should have been copied over...
+        for attr in ('foo', 'bar', 'baz'):
+            with self.subTest(attribute=attr):
+                self.assertFalse(hasattr(result, attr))
+
+    def test_copy_attrs_exclude(self):
+        result = self.page.get_specific(copy_attrs_exclude=['baz'])
+
+        # foo and bar should have been copied over
+        self.assertIs(result.foo, self.page.foo)
+        self.assertIs(result.bar, self.page.bar)
+
+        # but baz should not have been
+        self.assertFalse(hasattr(result, 'baz'))
+
+    def test_copy_attrs_exclude_with_empty_list(self):
+        result = self.page.get_specific(copy_attrs_exclude=())
+
+        # All non-field attributes should have been copied over...
+        for attr in ('foo', 'bar', 'baz'):
+            with self.subTest(attribute=attr):
+                self.assertIs(getattr(result, attr), getattr(self.page, attr))
+
+    def test_specific_cached_property(self):
+        # invoking several times to demonstrate that field values
+        # are fetched only once from the database, and each time the
+        # same object is returned
+        with self.assertNumQueries(1):
+            result = self.page.specific
+            result_2 = self.page.specific
+            result_3 = self.page.specific
+            self.assertIs(result, result_2)
+            self.assertIs(result, result_3)
+
+        self.assertIsInstance(result, SimplePage)
+        # Specific model fields values are available without additional queries
+        with self.assertNumQueries(0):
+            self.assertTrue(result.content)
+
+    def test_specific_deferred_cached_property(self):
+        # invoking several times to demonstrate that the property
+        # returns the same object (without any queries)
+        with self.assertNumQueries(0):
+            result = self.page.specific_deferred
+            result_2 = self.page.specific_deferred
+            result_3 = self.page.specific_deferred
+            self.assertIs(result, result_2)
+            self.assertIs(result, result_3)
+
+        self.assertIsInstance(result, SimplePage)
+        # Specific model fields values are not available without additional queries
+        with self.assertNumQueries(1):
+            self.assertTrue(result.content)
+
+
 class TestCopyPage(TestCase):
     fixtures = ['test.json']
 
@@ -1576,6 +1698,22 @@ class TestCopyPage(TestCase):
         )
         self.assertFalse(signal_fired)
 
+    def test_copy_alias_page(self):
+        about_us = SimplePage.objects.get(url_path='/home/about-us/')
+        about_us_alias = about_us.create_alias(update_slug='about-us-alias')
+
+        about_us_alias_copy = about_us_alias.copy(update_attrs={
+            'slug': 'about-us-alias-copy'
+        })
+
+        self.assertIsInstance(about_us_alias_copy, SimplePage)
+        self.assertEqual(about_us_alias_copy.slug, 'about-us-alias-copy')
+        self.assertNotEqual(about_us_alias_copy.id, about_us.id)
+        self.assertEqual(about_us_alias_copy.url_path, '/home/about-us-alias-copy/')
+
+        # The copy should just be a copy of the original page, not an alias
+        self.assertIsNone(about_us_alias_copy.alias_of)
+
 
 class TestCreateAlias(TestCase):
     fixtures = ['test.json']
@@ -1967,6 +2105,45 @@ class TestUpdateAliases(TestCase):
         # Draft titles shouldn't update as alias pages do not have drafts
         self.assertEqual(alias.draft_title, "Updated title")
         self.assertEqual(alias_alias.draft_title, "Updated title")
+
+        # Check log entries were created
+        self.assertTrue(PageLogEntry.objects.filter(page=alias, action='wagtail.publish').exists())
+        self.assertTrue(PageLogEntry.objects.filter(page=alias_alias, action='wagtail.publish').exists())
+
+    def test_update_aliases_publishes_drafts(self):
+        event_page = EventPage.objects.get(url_path='/home/events/christmas/')
+
+        # Unpublish the event page so that the aliases will be created in draft
+        event_page.live = False
+        event_page.has_unpublished_changes = True
+        event_page.save(clean=False)
+
+        alias = event_page.create_alias(update_slug='new-event-page')
+        alias_alias = alias.create_alias(update_slug='new-event-page-2')
+
+        self.assertFalse(alias.live)
+        self.assertFalse(alias_alias.live)
+
+        # Publish the event page
+        event_page.live = True
+        event_page.has_unpublished_changes = False
+        event_page.save(clean=False)
+
+        # Nothing should've happened yet
+        alias.refresh_from_db()
+        alias_alias.refresh_from_db()
+        self.assertFalse(alias.live)
+        self.assertFalse(alias_alias.live)
+
+        PageLogEntry.objects.all().delete()
+
+        event_page.update_aliases()
+
+        # Check that the aliases have been updated
+        alias.refresh_from_db()
+        alias_alias.refresh_from_db()
+        self.assertTrue(alias.live)
+        self.assertTrue(alias_alias.live)
 
         # Check log entries were created
         self.assertTrue(PageLogEntry.objects.filter(page=alias, action='wagtail.publish').exists())
@@ -2776,3 +2953,28 @@ class TestLocalized(TestCase):
         with translation.override("fr"):
             self.assertEqual(self.event_page.localized, self.event_page)
             self.assertEqual(self.event_page.localized_draft, self.fr_event_page.page_ptr)
+
+    def test_localized_with_non_content_active_locale(self):
+        # if active locale does not have a Locale record, use default locale
+        with translation.override("de"):
+            self.assertEqual(self.event_page.localized, self.event_page)
+            self.assertEqual(self.fr_event_page.localized, self.event_page.specific)
+            self.assertEqual(self.event_page.localized_draft, self.event_page)
+            self.assertEqual(self.fr_event_page.localized_draft, self.event_page.specific)
+
+    def test_localized_with_missing_default_locale(self):
+        # if neither active locale nor default language code have a Locale record, return self
+
+        # Change the 'en' locale to 'pl', so that no locale record for LANGUAGE_CODE exists.
+        # This replicates a scenario where a site was originally built with LANGUAGE_CODE='pl'
+        # but subsequently changed to LANGUAGE_CODE='en' (a change which was not reflected in
+        # the database).
+        en_locale = Locale.objects.get(language_code="en")
+        en_locale.language_code = "pl"
+        en_locale.save()
+
+        with translation.override("de"):
+            self.assertEqual(self.event_page.localized, self.event_page)
+            self.assertEqual(self.fr_event_page.localized, self.fr_event_page)
+            self.assertEqual(self.event_page.localized_draft, self.event_page)
+            self.assertEqual(self.fr_event_page.localized_draft, self.fr_event_page)

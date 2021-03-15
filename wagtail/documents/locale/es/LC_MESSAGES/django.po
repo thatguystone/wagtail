@@ -3,11 +3,11 @@
 # This file is distributed under the same license as the PACKAGE package.
 #
 # Translators:
-# fooflare <amos.oviedo@gmail.com>, 2014
-# fooflare <amos.oviedo@gmail.com>, 2014
+# Amós Oviedo <amos.oviedo@gmail.com>, 2014
+# Amós Oviedo <amos.oviedo@gmail.com>, 2014,2020
 # Daniel Chimeno <daniel@chimeno.me>, 2016
 # Daniel Chimeno <daniel@chimeno.me>, 2016
-# fooflare <amos.oviedo@gmail.com>, 2014
+# Amós Oviedo <amos.oviedo@gmail.com>, 2014
 # Joaquín T <joaquintita@gmail.com>, 2014
 # José Luis <alagunajs@gmail.com>, 2015-2016
 # José Luis <alagunajs@gmail.com>, 2018
@@ -19,8 +19,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Wagtail\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-10-23 12:34+0100\n"
-"PO-Revision-Date: 2020-10-23 11:36+0000\n"
+"POT-Creation-Date: 2021-01-18 17:31+0000\n"
+"PO-Revision-Date: 2021-01-18 17:32+0000\n"
 "Last-Translator: Matt Westcott <matthew@torchbox.com>\n"
 "Language-Team: Spanish (http://www.transifex.com/torchbox/wagtail/language/"
 "es/)\n"
@@ -276,11 +276,8 @@ msgstr ""
 msgid "Sorry, upload failed."
 msgstr "Lo sentimos, su subida ha fallado."
 
-msgid "Update"
-msgstr "Actualizar"
-
-msgid "Delete"
-msgstr "Eliminar"
+msgid "Document updated."
+msgstr "Documento actualizado."
 
 msgid "You need a password to access this document."
 msgstr "Necesita una contraseña para acceder a este documento."
@@ -314,6 +311,9 @@ msgid ""
 msgstr ""
 "El archivo no ha sido encontrado. Por favor cambie la fuente o elimine el "
 "documento."
+
+msgid "Delete"
+msgstr "Eliminar"
 
 msgid "Document '{0}' deleted."
 msgstr "Documento '{0}' eliminado."

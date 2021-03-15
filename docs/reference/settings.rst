@@ -31,9 +31,9 @@ When ``WAGTAIL_APPEND_SLASH`` is ``False``, requests to Wagtail pages will be se
 
 .. note::
 
-  If you use the ``False`` setting, keep in mind that serving your pages both with and without slashes may affect search engines' ability to index your site. See `this Google Webmaster Blog post`_ for more details.
+  If you use the ``False`` setting, keep in mind that serving your pages both with and without slashes may affect search engines' ability to index your site. See `this Google Search Central Blog post`_ for more details.
 
-.. _this Google Webmaster Blog post: https://webmasters.googleblog.com/2010/04/to-slash-or-not-to-slash.html
+.. _this Google Search Central Blog post: https://developers.google.com/search/blog/2010/04/to-slash-or-not-to-slash
 
 Search
 ======
@@ -207,7 +207,15 @@ Images
 
   WAGTAILIMAGES_IMAGE_MODEL = 'myapp.MyImage'
 
-This setting lets you provide your own image model for use in Wagtail, which might extend the built-in ``AbstractImage`` class or replace it entirely.
+This setting lets you provide your own image model for use in Wagtail, which should extend the built-in ``AbstractImage`` class.
+
+
+.. code-block:: python
+
+  WAGTAILIMAGES_IMAGE_FORM_BASE = 'myapp.forms.MyImageBaseForm'
+
+This setting lets you provide your own image base form for use in Wagtail, which might extend the built-in ``BaseImageForm`` class or replace it entirely.
+You can use it to specify or override the widgets to use in the admin form.
 
 
 .. code-block:: python
@@ -248,6 +256,21 @@ Specifies the number of images shown per page in the image chooser modal.
 
 Documents
 =========
+
+.. code-block:: python
+
+  WAGTAILDOCS_DOCUMENT_MODEL = 'myapp.MyDocument'
+
+This setting lets you provide your own document model for use in Wagtail, which should extend the built-in ``AbstractDocument`` class.
+
+
+.. code-block:: python
+
+  WAGTAILDOCS_DOCUMENT_FORM_BASE = 'myapp.forms.MyDocumentBaseForm'
+
+This setting lets you provide your own Document base form for use in Wagtail, which might extend the built-in ``BaseDocumentForm`` class or replace it entirely.
+You can use it to specify or override the widgets to use in the admin form.
+
 
 .. _wagtaildocs_serve_method:
 
@@ -636,10 +659,6 @@ Customise the behaviour of rich text fields. By default, ``RichTextField`` and `
  * ``OPTIONS``: Configuration options to pass to the widget. Recognised options are widget-specific, but both ``DraftailRichTextArea`` and ``HalloRichTextArea`` accept a ``features`` list indicating the active rich text features (see :ref:`rich_text_features`).
 
 If a ``'default'`` editor is not specified, rich text fields that do not specify an ``editor`` argument will use the Draftail editor with the default feature set enabled.
-
-.. versionchanged:: 2.10
-
-    Omitting the ``'default'`` editor now leaves the original default editor intact, so it is no longer necessary to redefine ``'default'`` when adding alternative editors.
 
 
 .. _WAGTAILADMIN_GLOBAL_PAGE_EDIT_LOCK:

@@ -47,7 +47,24 @@ The parameter to ``StreamField`` is a list of ``(name, block_type)`` tuples. 'na
 
 This defines the set of available block types that can be used within this field. The author of the page is free to use these blocks as many times as desired, in any order.
 
-``StreamField`` also accepts an optional keyword argument ``blank``, defaulting to false; when this is false, at least one block must be provided for the field to be considered valid.
+``StreamField`` also accepts the following optional keyword arguments:
+
+``blank`` (default: ``False``)
+  When false, at least one block must be provided for the field to be considered valid.
+
+``min_num``
+  Minimum number of sub-blocks that the stream must have.
+
+``max_num``
+  Maximum number of sub-blocks that the stream may have.
+
+``block_counts``
+  Specifies the minimum and maximum number of each block type, as a dictionary mapping block names to dicts with (optional) ``min_num`` and ``max_num`` fields.
+
+.. versionadded:: 2.13
+
+    The ``min_num``, ``max_num`` and ``block_counts`` arguments were added. Previously, these were only available on the ``StreamBlock`` definition.
+
 
 Basic block types
 -----------------
@@ -518,6 +535,7 @@ As with StructBlock, the list of sub-blocks can also be provided as a subclass o
         class Meta:
             icon='cogs'
 
+.. _streamfield_top_level_streamblock:
 
 Since ``StreamField`` accepts an instance of ``StreamBlock`` as a parameter, in place of a list of block types, this makes it possible to re-use a common set of block types without repeating definitions:
 
@@ -1023,6 +1041,32 @@ Your extended value class methods will be available in your template:
         {% endfor %}
     </div>
 
+
+.. _modifying_streamfield_data:
+
+Modifying StreamField data
+--------------------------
+
+A StreamField's value behaves as a list, and blocks can be inserted, overwritten and deleted before saving the instance back to the database. A new item can be written to the list as a tuple of *(block_type, value)* - when read back, it will be returned as a ``BoundBlock`` object.
+
+.. code-block:: python
+
+    # Replace the first block with a new block of type 'heading'
+    my_page.body[0] = ('heading', "My story")
+
+    # Delete the last block
+    del my_page.body[-1]
+
+    # Append a block to the stream
+    my_page.body.append(('paragraph', "<p>And they all lived happily ever after.</p>"))
+
+    # Save the updated data back to the database
+    my_page.save()
+
+
+.. versionadded:: 2.12
+
+    In earlier versions, a StreamField value could be replaced by assigning a new list of *(block_type, value)* tuples, but not modified in-place.
 
 
 Custom block types

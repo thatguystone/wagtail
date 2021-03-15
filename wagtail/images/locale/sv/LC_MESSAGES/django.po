@@ -4,7 +4,7 @@
 #
 # Translators:
 # Jim Brouzoulis <jim.brouzoulis@chalmers.se>, 2017
-# Martin Sandström <martin@marteinn.se>, 2020
+# Martin Sandström <martin@marteinn.se>, 2020-2021
 # Oscar Fröberg <oscfr657@gmail.com>, 2020
 # Philip Andersen <renegadevi@codeofmagi.net>, 2018-2019
 # Thomas Kunambi <kunambi@gmail.com>, 2015
@@ -12,8 +12,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Wagtail\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-10-23 12:34+0100\n"
-"PO-Revision-Date: 2020-05-24 18:55+0000\n"
+"POT-Creation-Date: 2021-01-18 17:30+0000\n"
+"PO-Revision-Date: 2021-02-02 19:28+0000\n"
 "Last-Translator: Martin Sandström <martin@marteinn.se>\n"
 "Language-Team: Swedish (http://www.transifex.com/torchbox/wagtail/language/"
 "sv/)\n"
@@ -107,10 +107,16 @@ msgid "Add/edit images you own"
 msgstr "Lägg till/redigera bilder du äger"
 
 msgid "Edit"
-msgstr "Editera"
+msgstr "Redigera"
 
 msgid "Edit any image"
 msgstr "Redigera alla bilder"
+
+msgid "Choose"
+msgstr "Välj"
+
+msgid "Select images in choosers"
+msgstr "Markera bilder i väljare"
 
 msgid "title"
 msgstr "titel"
@@ -236,7 +242,7 @@ msgid "Editing image %(title)s"
 msgstr "Redigerar bild %(title)s"
 
 msgid "Editing"
-msgstr "Editerar"
+msgstr "Redigerar"
 
 msgid "URL Generator"
 msgstr "URL-Generator"
@@ -340,7 +346,7 @@ msgid "Status"
 msgstr "Status"
 
 msgid "Edit this page"
-msgstr "Editera denna sida"
+msgstr "Redigera denna sida"
 
 msgid "Add multiple images"
 msgstr "Lägg till flera bilder"
@@ -379,12 +385,6 @@ msgstr ""
 msgid "Image updated."
 msgstr "Bilden uppdaterades."
 
-msgid "Update"
-msgstr "Uppdatera"
-
-msgid "Delete"
-msgstr "Radera"
-
 msgid "Image permissions"
 msgstr "Bildrättigheter"
 
@@ -409,6 +409,9 @@ msgid ""
 msgstr ""
 "Filen för originalbilden kunde inte hittas. Vänligen ändra filen eller ta "
 "bort bilden."
+
+msgid "Delete"
+msgstr "Radera"
 
 msgid "Image '{0}' deleted."
 msgstr "Bild '{0}' raderad."

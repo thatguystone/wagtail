@@ -414,7 +414,6 @@ ul.listing {
 
             &.bicolor {
                 background: $color-teal-darker;
-                border: solid 1px darken($color-teal-darker, 10%);
 
                 &:active {
                     color: $color-white;
@@ -580,6 +579,15 @@ table.listing {
     li {
         padding: 0.8em;
         float: left;
+    }
+
+    &__icon {
+        width: 1em;
+        height: 1em;
+        margin-right: 0.2em;
+        vertical-align: middle;
+        position: relative;
+        top: -1px;
     }
 }
 
