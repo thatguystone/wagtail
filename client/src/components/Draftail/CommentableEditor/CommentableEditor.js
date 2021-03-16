@@ -41,6 +41,15 @@ class DraftailInlineAnnotation {
     }
 }
 
+function applyInlineStyleToRange({contentState, style, blockKey, start, end}) {
+  let selectionState = SelectionState.createEmpty();
+  selectionState = selectionState.set('anchorKey', blockKey);
+  selectionState = selectionState.set('focusKey', blockKey);
+  selectionState = selectionState.set('anchorOffset', start);
+  selectionState = selectionState.set('focusOffset', end);
+  return Modifier.applyInlineStyle(contentState, selectionState, style)
+}
+
 function getFullSelectionState(contentState) {
   // Get a selection state corresponding to the full contentState
   const lastBlock = contentState.getLastBlock();
@@ -61,16 +70,18 @@ function getCommentControl(commentApp, contentPath, fieldNode) {
       icon={<Icon name="comment"/>}
       onClick={() => {
         const annotation = new DraftailInlineAnnotation(fieldNode)
-        const commentId = commentApp.makeComment(annotation, contentPath);
+        const commentId = commentApp.makeComment(annotation, contentPath, '[]');
         onChange(RichUtils.toggleInlineStyle(getEditorState(), COMMENT_STYLE_IDENTIFIER + commentId))
       }}
     />
   }
 }
 
+const commentFilterFunction = (metadata) => metadata.getStyle().some((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER))
+
 function findCommentStyleRanges(contentBlock, callback, filterFn) {
     // Find comment style ranges that do not overlap an existing entity
-    const filterFunction = filterFn ? filterFn : (metadata) => metadata.getStyle().some((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER))
+    const filterFunction = filterFn ? filterFn : commentFilterFunction
     const entityRanges = [];
     contentBlock.findEntityRanges(character => character.getEntity() !== null, (start, end) => entityRanges.push([start, end]));
     contentBlock.findStyleRanges(filterFunction, (start, end) => {
@@ -211,13 +222,36 @@ function CommentableEditor({commentApp, fieldNode, contentPath, rawContentState,
       // This hack can be removed when draft-js triggers inline style rerender on props change
       setEditorState(editorState => forceResetEditorState(editorState, 
         Modifier.applyInlineStyle(
-          filteredContent,
+          filterInlineStyles(inlineStyles.map(style => style.type).concat(ids.map(id => COMMENT_STYLE_IDENTIFIER + id)), editorState.getCurrentContent()),
           getFullSelectionState(filteredContent),
           'STYLE_RERENDER_'+uniqueStyleId
         )
       ))
       setUniqueStyleId((id) => (id + 1) % 200);
     }, [focusedId, enabled, inlineStyles, ids, editorState])
+
+    useEffect(() => {
+      // if there are any comments without annotations, we need to add them to the EditorState
+      let contentState = editorState.getCurrentContent();
+      let hasUpdated = false;
+      comments.filter(comment => !comment.annotation).forEach((comment) => {
+        commentApp.updateAnnotation(new DraftailInlineAnnotation(fieldNode), comment.localId);
+        const style = `${COMMENT_STYLE_IDENTIFIER}${comment.localId}`
+        try {
+          const position = JSON.parse(comment.position)
+          position.forEach((position) => {
+            contentState = applyInlineStyleToRange({contentState, blockKey: position.key, start: position.start, end: position.end, style})
+            hasUpdated = true;
+          })
+        }
+        catch(err) {
+          console.error(`Error loading comment position for comment ${comment.localId}`)
+        }
+      })
+      if (hasUpdated) {
+        setEditorState(forceResetEditorState(editorState, contentState))
+      }
+    }, [comments])
 
     const timeoutRef = useRef();
     useEffect(() => {
@@ -227,13 +261,51 @@ function CommentableEditor({commentApp, fieldNode, contentPath, rawContentState,
         filterInlineStyles(inlineStyles.map(style => style.type), editorState.getCurrentContent())
       );
       timeoutRef.current = window.setTimeout(
-        onSave(serialiseEditorStateToRaw(filteredEditorState)),
+        () => {
+          onSave(serialiseEditorStateToRaw(filteredEditorState))
+
+          // Next, update comment positions in the redux store
+
+          // Construct a map of comment id -> array of style ranges
+          const commentPositions = new Map()
+          editorState.getCurrentContent().getBlocksAsArray().forEach(
+            (block) => {
+              const key = block.getKey()
+              block.findStyleRanges(commentFilterFunction, 
+              (start, end) => {
+                block.getInlineStyleAt(start).filter((style) => style.startsWith(COMMENT_STYLE_IDENTIFIER)).forEach(
+                  (style) => {
+                    const id = parseInt(style.slice(8));
+                    let existingPosition = commentPositions.get(id)
+                    if (!existingPosition) {
+                      existingPosition = []
+                    }
+                    existingPosition.push({
+                      'key': key,
+                      'start': start,
+                      'end': end
+                    })
+                    commentPositions.set(id, existingPosition)
+                  }
+                )
+              })
+            }
+          )
+          comments.filter(comment => comment.annotation).forEach((comment) => {
+            // if a comment has an annotation - ie the field has it inserted - update its position
+            const newPosition = commentPositions.get(comment.localId);
+            const serializedNewPosition = newPosition ? JSON.stringify(newPosition) : '[]'
+            if (comment.position !== serializedNewPosition) {
+              commentApp.store.dispatch(commentApp.actions.updateComment(comment.localId, {position: serializedNewPosition}))
+            }
+          })
+        },
         250,
       );
       return () => {
         window.clearTimeout(timeoutRef.current);
       }
-    }, [editorState, inlineStyles]);
+    }, [editorState, inlineStyles, commentApp]);
 
     return <DraftailEditor
     ref={editorRef}
