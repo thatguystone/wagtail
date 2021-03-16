@@ -3,12 +3,12 @@ import json
 from unittest.mock import patch
 
 from django.test import TestCase
-
-from wagtail.admin.rich_text.converters.contentstate import ContentstateConverter, persist_key_for_block
-from wagtail.embeds.models import Embed
-
 from draftjs_exporter.dom import DOM
 from draftjs_exporter.html import HTML as HTMLExporter
+
+from wagtail.admin.rich_text.converters.contentstate import (
+    ContentstateConverter, persist_key_for_block)
+from wagtail.embeds.models import Embed
 
 
 def content_state_equal(v1, v2, match_keys=False):
