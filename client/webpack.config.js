@@ -17,8 +17,8 @@ const getOutputPath = (app, filename) => {
 // Mapping from package name to exposed global variable.
 const exposedDependencies = {
   'focus-trap-react': 'FocusTrapReact',
-  'react': 'React',
-  'react-dom': 'ReactDOM',
+  //'react': 'React',
+  //'react-dom': 'ReactDOM',
   'react-transition-group/CSSTransitionGroup': 'CSSTransitionGroup',
   'draft-js': 'DraftJS',
 };
@@ -26,6 +26,7 @@ const exposedDependencies = {
 module.exports = function exports() {
   const entrypoints = {
     'admin': [
+      'comments',
       'core',
       'date-time-chooser',
       'draftail',
@@ -76,18 +77,15 @@ module.exports = function exports() {
         filename: getOutputPath(appName, moduleName) + '.js',
       };
 
-  entry[getOutputPath('admin', 'wagtailadmin')] = [
-    './client/src/utils/polyfills.js',
-    getEntryPath('admin', 'wagtailadmin.entry.js'),
-  ];
-  entry[getOutputPath('admin', 'draftail')] = [
-    './client/src/utils/polyfills.js',
-    getEntryPath('admin', 'draftail.entry.js'),
-  ];
-  entry[getOutputPath('admin', 'comments')] = [
-    './client/src/utils/polyfills.js',
-    getEntryPath('admin', 'comments.entry.js'),
-  ];
+      // Add polyfills to all bundles except userbar
+      // polyfills.js imports from node_modules, which adds a dependency on vendor.js (produced by splitChunks)
+      // Because userbar is supposed to run on peoples frontends, we code it using portable JS so we don't need
+      // to pull in all the additional JS that the vendor bundle has (such as React).
+      if (moduleName !== 'userbar') {
+        entry[moduleName].import.push('./client/src/utils/polyfills.js');
+      }
+    });
+  }
 
   return {
     entry: entry,

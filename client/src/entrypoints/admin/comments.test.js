@@ -1,6 +1,6 @@
-require('./comments.entry');
+require('./comments');
 
-describe('comments.entry', () => {
+describe('comments', () => {
   it('exposes module as global', () => {
     expect(window.comments).toBeDefined();
   });
