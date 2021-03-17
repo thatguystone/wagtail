@@ -17,8 +17,8 @@ const getOutputPath = (app, filename) => {
 // Mapping from package name to exposed global variable.
 const exposedDependencies = {
   'focus-trap-react': 'FocusTrapReact',
-  //'react': 'React',
-  //'react-dom': 'ReactDOM',
+  'react': 'React',
+  'react-dom': 'ReactDOM',
   'react-transition-group/CSSTransitionGroup': 'CSSTransitionGroup',
   'draft-js': 'DraftJS',
 };

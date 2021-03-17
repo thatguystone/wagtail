@@ -6,6 +6,7 @@ import comments, { initAddCommentButton } from '../../components/CommentApp/comm
 // Expose module as a global.
 window.comments = comments;
 
+comments.initComments();
 
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-comment-add]').forEach(initAddCommentButton);
