@@ -5,7 +5,9 @@ from collections import OrderedDict
 
 from django.core.exceptions import FieldDoesNotExist
 from django.http import HttpResponse, StreamingHttpResponse
+from django.utils.dateformat import Formatter
 from django.utils.encoding import force_str
+from django.utils.formats import get_format
 from django.utils.translation import gettext as _
 from xlsxwriter.workbook import Workbook
 
@@ -59,6 +61,52 @@ class Echo:
 
 def list_to_str(value):
     return force_str(", ".join(value))
+
+
+class ExcelDateFomatter(Formatter):
+    data = None
+
+    def get(self):
+        format = get_format("SHORT_DATETIME_FORMAT")
+        return self.format(format)
+
+    d = lambda self: "DD" # noqa
+    j = lambda self: "D" # noqa
+    D = lambda self: "NN" # noqa
+    l = lambda self: "NNNN" # noqa
+    S = lambda self: "" # noqa
+    w = lambda self: "" # noqa
+    z = lambda self: "" # noqa
+    W = lambda self: "" # noqa
+    m = lambda self: "MM" # noqa
+    n = lambda self: "M" # noqa
+    M = lambda self: "MMM" # noqa
+    b = lambda self: "MMM" # noqa
+    F = lambda self: "MMMM" # noqa
+    E = lambda self: "MMM" # noqa
+    N = lambda self: "MMM." # noqa
+    y = lambda self: "YY" # noqa
+    Y = lambda self: "YYYY" # noqa
+    L = lambda self: "" # noqa
+    o = lambda self: "" # noqa
+    g = lambda self: "H" # noqa
+    G = lambda self: "H" # noqa
+    h = lambda self: "HH" # noqa
+    H = lambda self: "HH" # noqa
+    i = lambda self: "MM" # noqa
+    s = lambda self: "SS" # noqa
+    u = lambda self: "" # noqa
+    a = lambda self: "AM/PM" # noqa
+    A = lambda self: "AM/PM" # noqa
+    P = lambda self: "HH:SS AM/PM" # noqa
+    e = lambda self: "" # noqa
+    I = lambda self: "" # noqa
+    O = lambda self: "" # noqa
+    T = lambda self: "" # noqa
+    Z = lambda self: "" # noqa
+    c = lambda self: "YYYY-MM-DD HH:MM:SS" # noqa
+    r = lambda self: "NN, MMM D YY HH:MM:SS" # noqa
+    U = lambda self: "[HH]:MM:SS" # noqa
 
 
 class SpreadsheetExportMixin:
@@ -174,7 +222,7 @@ class SpreadsheetExportMixin:
                 "in_memory": True,
                 "constant_memory": True,
                 "remove_timezone": True,
-                "default_date_format": "dd/mm/yy hh:mm:ss",
+                "default_date_format": ExcelDateFomatter().get(),
             },
         )
         worksheet = workbook.add_worksheet()
